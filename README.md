@@ -33,6 +33,10 @@ A lightweight, feature-rich HTTP/HTTPS/WebSocket proxy server with authenticatio
 
 4. Configure your browser or device to use the proxy server
 
+```bash
+
+```
+
 ## Manual Installation
 
 ### 1. Install Node.js
