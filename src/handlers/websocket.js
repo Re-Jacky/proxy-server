@@ -3,22 +3,6 @@ const url = require('url');
 const { log } = require('../logger');
 const { CONNECTION_TIMEOUT } = require('../config');
 
-function isPrivateIP(hostname) {
-  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-  if (!ipv4Regex.test(hostname)) {
-    return false;
-  }
-  
-  const parts = hostname.split('.').map(Number);
-  
-  if (parts[0] === 127) return true;
-  if (parts[0] === 10) return true;
-  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
-  if (parts[0] === 192 && parts[1] === 168) return true;
-  
-  return false;
-}
-
 function handleWebSocketUpgrade(req, socket) {
   const clientIp = socket.remoteAddress;
   const parsedUrl = url.parse(req.url);
@@ -31,17 +15,6 @@ function handleWebSocketUpgrade(req, socket) {
       url: req.url
     });
     socket.write(`HTTP/${req.httpVersion} 400 Bad Request\r\n\r\n`);
-    socket.end();
-    return;
-  }
-  
-  if (isPrivateIP(targetHost)) {
-    log('warn', 'SSRF attempt detected in WebSocket', {
-      clientIp: clientIp,
-      targetHost: targetHost,
-      url: req.url
-    });
-    socket.write(`HTTP/${req.httpVersion} 403 Forbidden\r\n\r\n`);
     socket.end();
     return;
   }

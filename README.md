@@ -6,7 +6,7 @@ A production-ready, lightweight HTTP/HTTPS/WebSocket proxy server with authentic
 
 - ✅ HTTP, HTTPS, and WebSocket proxy support
 - ✅ Basic authentication with rate limiting
-- ✅ Security hardening (SSRF protection, input validation)
+- ✅ Security hardening (input validation)
 - ✅ Health check endpoint for monitoring
 - ✅ Graceful shutdown handling
 - ✅ Request/connection timeouts
@@ -171,14 +171,6 @@ Use this endpoint for:
 - Automatic rate limiting on failed authentication attempts
 - Max 5 failed attempts per IP per minute
 - Prevents brute force attacks
-
-### SSRF Protection
-- Blocks requests to private IP ranges:
-  - 127.0.0.0/8 (localhost)
-  - 10.0.0.0/8
-  - 172.16.0.0/12
-  - 192.168.0.0/16
-- Validates all target URLs
 
 ### Input Validation
 - URL validation for all proxy requests

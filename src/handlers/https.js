@@ -2,22 +2,6 @@ const net = require('net');
 const { log } = require('../logger');
 const { CONNECTION_TIMEOUT } = require('../config');
 
-function isPrivateIP(hostname) {
-  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-  if (!ipv4Regex.test(hostname)) {
-    return false;
-  }
-  
-  const parts = hostname.split('.').map(Number);
-  
-  if (parts[0] === 127) return true;
-  if (parts[0] === 10) return true;
-  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
-  if (parts[0] === 192 && parts[1] === 168) return true;
-  
-  return false;
-}
-
 function handleHTTPSProxy(req, clientSocket, head) {
   const clientIp = clientSocket.remoteAddress;
   const [hostname, port] = req.url.split(':');
@@ -33,19 +17,8 @@ function handleHTTPSProxy(req, clientSocket, head) {
     return;
   }
   
-  if (isPrivateIP(hostname)) {
-    log('warn', 'SSRF attempt detected in HTTPS CONNECT', {
-      clientIp: clientIp,
-      targetHost: hostname,
-      url: req.url
-    });
-    clientSocket.write(`HTTP/${req.httpVersion} 403 Forbidden\r\n\r\n`);
-    clientSocket.end();
-    return;
-  }
-  
   const serverOptions = {
-    hostname: hostname,
+    host: hostname,
     port: targetPort,
     timeout: CONNECTION_TIMEOUT
   };

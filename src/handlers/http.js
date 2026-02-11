@@ -3,22 +3,6 @@ const url = require('url');
 const { log } = require('../logger');
 const { REQUEST_TIMEOUT } = require('../config');
 
-function isPrivateIP(hostname) {
-  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-  if (!ipv4Regex.test(hostname)) {
-    return false;
-  }
-  
-  const parts = hostname.split('.').map(Number);
-  
-  if (parts[0] === 127) return true;
-  if (parts[0] === 10) return true;
-  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
-  if (parts[0] === 192 && parts[1] === 168) return true;
-  
-  return false;
-}
-
 function handleHTTPProxy(req, res) {
   const clientIp = req.socket.remoteAddress;
   const parsedUrl = url.parse(req.url);
@@ -30,17 +14,6 @@ function handleHTTPProxy(req, res) {
     });
     res.writeHead(400);
     res.end('Bad Request: Invalid URL');
-    return;
-  }
-  
-  if (isPrivateIP(parsedUrl.hostname)) {
-    log('warn', 'SSRF attempt detected', {
-      clientIp: clientIp,
-      targetHost: parsedUrl.hostname,
-      url: req.url
-    });
-    res.writeHead(403);
-    res.end('Forbidden: Access to private IP addresses is not allowed');
     return;
   }
   
