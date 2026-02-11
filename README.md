@@ -1,15 +1,15 @@
 # Proxy Server
 
-A production-ready, lightweight HTTP/HTTPS/WebSocket proxy server with authentication, rate limiting, security hardening, and comprehensive logging. Built with pure Node.js - no heavy frameworks.
+A production-ready, lightweight HTTP/HTTPS/WebSocket proxy server with authentication, security hardening, and comprehensive logging. Built with pure Node.js - no heavy frameworks.
 
 ## Features
 
 - ✅ HTTP, HTTPS, and WebSocket proxy support
-- ✅ Basic authentication with rate limiting
+- ✅ Basic authentication
 - ✅ Security hardening (input validation)
 - ✅ Health check endpoint for monitoring
 - ✅ Graceful shutdown handling
-- ✅ Request/connection timeouts
+- ✅ Configurable timeouts and connection limits
 - ✅ Async logging with JSON format
 - ✅ Modular, maintainable code structure
 - ✅ Comprehensive test suite with Jest
@@ -63,7 +63,7 @@ LOG_LEVEL=info
 
 # Timeout settings (milliseconds)
 REQUEST_TIMEOUT=30000
-CONNECTION_TIMEOUT=10000
+CONNECTION_TIMEOUT=20000
 MAX_CONNECTIONS=1000
 ```
 
@@ -72,6 +72,12 @@ MAX_CONNECTIONS=1000
 - Username must be at least 3 characters
 - Password must be at least 8 characters
 - The server will refuse to start with missing or weak credentials
+
+**Timeout Configuration:**
+- `REQUEST_TIMEOUT`: Maximum time (ms) to wait for HTTP request to complete (default: 30000ms / 30 seconds)
+- `CONNECTION_TIMEOUT`: Maximum time (ms) to wait for socket connection to establish (default: 20000ms / 20 seconds)
+- `MAX_CONNECTIONS`: Maximum number of concurrent connections allowed (default: 1000)
+- Adjust these values based on your network conditions and use case
 
 ### 3. Start the Proxy Server
 
@@ -103,17 +109,37 @@ npm run lint:fix
 
 ## Configuration Options
 
+All configuration is done via environment variables in the `.env` file.
+
+### Core Settings
+
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | 8080 | Server listen port (1-65535) |
 | `AUTH_ENABLED` | true | Enable/disable authentication |
 | `PROXY_USERNAME` | (required) | Basic auth username (min 3 chars) |
 | `PROXY_PASSWORD` | (required) | Basic auth password (min 8 chars) |
+
+### Logging Settings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
 | `LOG_FILE` | proxy.log | Log file name (in logs/ dir) |
 | `LOG_LEVEL` | info | Logging level: error, warn, info, debug |
-| `REQUEST_TIMEOUT` | 30000 | HTTP request timeout (ms) |
-| `CONNECTION_TIMEOUT` | 10000 | Socket connection timeout (ms) |
-| `MAX_CONNECTIONS` | 1000 | Maximum concurrent connections |
+
+### Timeout & Connection Settings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REQUEST_TIMEOUT` | 30000 | HTTP request timeout in milliseconds (30 seconds) |
+| `CONNECTION_TIMEOUT` | 20000 | Socket connection timeout in milliseconds (20 seconds) |
+| `MAX_CONNECTIONS` | 1000 | Maximum concurrent connections allowed |
+
+**Timeout Tuning Guidelines:**
+- **Slow networks**: Increase both timeouts (e.g., 60000ms / 60 seconds)
+- **Fast networks**: Decrease for quicker failure detection (e.g., 10000ms / 10 seconds)
+- **Large file transfers**: Increase `REQUEST_TIMEOUT` significantly
+- **High traffic**: Adjust `MAX_CONNECTIONS` based on system resources
 
 ## Usage
 
@@ -167,11 +193,6 @@ Use this endpoint for:
 
 ## Security Features
 
-### Rate Limiting
-- Automatic rate limiting on failed authentication attempts
-- Max 5 failed attempts per IP per minute
-- Prevents brute force attacks
-
 ### Input Validation
 - URL validation for all proxy requests
 - Header sanitization
@@ -190,7 +211,7 @@ proxy-server/
 │   ├── server.js              # Main entry point
 │   ├── config.js              # Configuration loading and validation
 │   ├── logger.js              # Async logging utilities
-│   ├── auth.js                # Authentication and rate limiting
+│   ├── auth.js                # Authentication
 │   └── handlers/
 │       ├── http.js            # HTTP proxy handler
 │       ├── https.js           # HTTPS CONNECT handler

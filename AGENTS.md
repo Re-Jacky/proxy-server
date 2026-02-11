@@ -59,7 +59,7 @@ All configuration is via `.env` file:
 | `LOG_FILE` | proxy.log | Log file name (in logs/ dir) |
 | `LOG_LEVEL` | info | Logging verbosity: error, warn, info, debug |
 | `REQUEST_TIMEOUT` | 30000 | HTTP request timeout (ms) |
-| `CONNECTION_TIMEOUT` | 10000 | Socket connection timeout (ms) |
+| `CONNECTION_TIMEOUT` | 20000 | Socket connection timeout (ms) |
 | `MAX_CONNECTIONS` | 1000 | Maximum concurrent connections |
 
 **Important**: Configuration validation happens at startup. The server will refuse to start with invalid config.
@@ -223,7 +223,7 @@ src/
 ├── server.js          # Server setup, health check, graceful shutdown
 ├── config.js          # Configuration loading and validation
 ├── logger.js          # Async logging utilities
-├── auth.js            # Authentication and rate limiting
+├── auth.js            # Authentication
 └── handlers/
     ├── http.js        # HTTP proxy handler with SSRF protection
     ├── https.js       # HTTPS CONNECT handler
@@ -234,7 +234,7 @@ src/
 - **server.js**: HTTP server creation, routing, graceful shutdown, signal handling
 - **config.js**: Loads .env, validates all config, exports constants
 - **logger.js**: Async file logging + console output, respects LOG_LEVEL
-- **auth.js**: Basic auth, rate limiting (5 attempts/min), credential validation
+- **auth.js**: Basic auth, credential validation
 - **handlers/*.js**: Protocol-specific proxy logic, input validation, error handling
 
 ## Common Operations
@@ -257,9 +257,7 @@ src/
 ### Security Considerations
 - **Never** log passwords or auth tokens
 - **Always** validate input (URLs, hostnames, headers)
-- **Always** check for SSRF (private IPs, localhost)
 - Clean proxy-specific headers: `delete options.headers['proxy-authorization']`
-- Use rate limiting for brute force protection
 
 ### Testing Patterns
 ```javascript

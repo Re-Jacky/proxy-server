@@ -25,7 +25,7 @@ const AUTH_ENABLED = process.env.AUTH_ENABLED !== 'false';
 const LOG_FILE = process.env.LOG_FILE || 'proxy.log';
 const LOG_LEVEL = validateLogLevel(process.env.LOG_LEVEL || 'info');
 const REQUEST_TIMEOUT = parseInt(process.env.REQUEST_TIMEOUT || '30000', 10);
-const CONNECTION_TIMEOUT = parseInt(process.env.CONNECTION_TIMEOUT || '10000', 10);
+const CONNECTION_TIMEOUT = parseInt(process.env.CONNECTION_TIMEOUT || '20000', 10);
 const MAX_CONNECTIONS = parseInt(process.env.MAX_CONNECTIONS || '1000', 10);
 
 // Validate credentials if authentication is enabled
