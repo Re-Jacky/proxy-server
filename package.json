@@ -2,15 +2,23 @@
   "name": "proxy-server",
   "version": "1.0.0",
   "description": "Lightweight HTTP/HTTPS proxy server with authentication support",
-  "main": "proxy.js",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node proxy.js",
-    "dev": "node proxy.js"
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/**/*.js test/**/*.js",
+    "lint:fix": "eslint src/**/*.js test/**/*.js --fix"
   },
   "dependencies": {
     "dotenv": "^16.4.5"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "eslint": "^10.0.0",
+    "globals": "^17.3.0",
+    "jest": "^30.2.0"
+  },
   "keywords": [
     "proxy",
     "server",

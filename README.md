@@ -1,96 +1,145 @@
 # Proxy Server
 
-A lightweight, feature-rich HTTP/HTTPS/WebSocket proxy server with authentication support and comprehensive logging. This proxy server can be easily deployed on Windows machines to allow other devices to route their traffic through it with proper authentication and detailed logging.
+A production-ready, lightweight HTTP/HTTPS/WebSocket proxy server with authentication, security hardening, and comprehensive logging. Built with pure Node.js - no heavy frameworks.
 
 ## Features
 
-- ✅ HTTP and HTTPS proxy support
-- ✅ WebSocket (ws:// and wss://) support
-- ✅ Basic authentication (username/password)
-- ✅ Authentication control (enable/disable)
-- ✅ Windows-friendly setup
-- ✅ Easy configuration via .env file
-- ✅ Comprehensive logging system
+- ✅ HTTP, HTTPS, and WebSocket proxy support
+- ✅ Basic authentication
+- ✅ Security hardening (input validation)
+- ✅ Health check endpoint for monitoring
+- ✅ Graceful shutdown handling
+- ✅ Configurable timeouts and connection limits
+- ✅ Async logging with JSON format
+- ✅ Modular, maintainable code structure
+- ✅ Comprehensive test suite with Jest
+- ✅ ESLint code linting
 - ✅ Cross-platform compatibility
-- ✅ Simple deployment
-- ✅ Detailed network tracing
-- ✅ Secure default settings
 
 ## Requirements
 
 - Node.js 12.x or higher
-- Windows, macOS, or Linux operating system
+- npm or yarn
 
-## Quick Start (Windows)
-
-1. **Download the proxy server files** to a folder on your Windows machine
-2. **Double-click `start.bat`** to launch the setup script
-3. The script will:
-
-   - Check if Node.js is installed
-   - Install required dependencies
-   - Start the proxy server
-
-4. Configure your browser or device to use the proxy server
+## Quick Start
 
 ```bash
+# Install dependencies
+npm install
 
+# Configure credentials (REQUIRED)
+# Edit .env and set PROXY_USERNAME and PROXY_PASSWORD
+
+# Start the server
+npm start
 ```
 
-## Manual Installation
+The server will start on port 8080 (configurable via `.env`).
 
-### 1. Install Node.js
+## Installation
 
-If Node.js is not already installed, download and install it from [https://nodejs.org/](https://nodejs.org/)
-
-### 2. Install Dependencies
+### 1. Install Dependencies
 
 ```bash
-# Navigate to the proxy server directory
-cd path/to/proxy-server
-
-# Install dependencies
 npm install
 ```
 
-### 3. Configure the Proxy Server
+### 2. Configure the Proxy Server
 
-Edit the `.env` file to customize your proxy settings:
+Edit the `.env` file to customize settings:
 
 ```env
-# Proxy Server Configuration
-# Port for the proxy server to listen on
-PORT=8888
+# Port for the proxy server
+PORT=8080
 
-# Authentication credentials
-# Change these to secure values before deployment
-USERNAME=admin
-PASSWORD=password
+# Authentication settings
+AUTH_ENABLED=true
+PROXY_USERNAME=your-username-here
+PROXY_PASSWORD=your-secure-password-here
+
+# Logging settings
+LOG_FILE=proxy.log
+LOG_LEVEL=info
+
+# Timeout settings (milliseconds)
+REQUEST_TIMEOUT=30000
+CONNECTION_TIMEOUT=20000
+MAX_CONNECTIONS=1000
 ```
 
-### 4. Start the Proxy Server
+**Important Security Notes:**
+- When `AUTH_ENABLED=true`, you MUST set `PROXY_USERNAME` and `PROXY_PASSWORD`
+- Username must be at least 3 characters
+- Password must be at least 8 characters
+- The server will refuse to start with missing or weak credentials
 
-#### On Windows:
+**Timeout Configuration:**
+- `REQUEST_TIMEOUT`: Maximum time (ms) to wait for HTTP request to complete (default: 30000ms / 30 seconds)
+- `CONNECTION_TIMEOUT`: Maximum time (ms) to wait for socket connection to establish (default: 20000ms / 20 seconds)
+- `MAX_CONNECTIONS`: Maximum number of concurrent connections allowed (default: 1000)
+- Adjust these values based on your network conditions and use case
 
-Double-click `start.bat` or run it from the command prompt:
-
-```cmd
-start.bat
-```
-
-#### On macOS/Linux:
+### 3. Start the Proxy Server
 
 ```bash
-node proxy.js
+npm start
+```
+
+## Development
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+```
+
+### Linting
+
+```bash
+# Check for linting errors
+npm run lint
+
+# Auto-fix linting errors
+npm run lint:fix
 ```
 
 ## Configuration Options
 
-| Option | Description | Default Value |
-|--------|-------------|---------------|
-| PORT | Port number for the proxy server | 8080 |
-| USERNAME | Username for proxy authentication | admin |
-| PASSWORD | Password for proxy authentication | password |
+All configuration is done via environment variables in the `.env` file.
+
+### Core Settings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | 8080 | Server listen port (1-65535) |
+| `AUTH_ENABLED` | true | Enable/disable authentication |
+| `PROXY_USERNAME` | (required) | Basic auth username (min 3 chars) |
+| `PROXY_PASSWORD` | (required) | Basic auth password (min 8 chars) |
+
+### Logging Settings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOG_FILE` | proxy.log | Log file name (in logs/ dir) |
+| `LOG_LEVEL` | info | Logging level: error, warn, info, debug |
+
+### Timeout & Connection Settings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REQUEST_TIMEOUT` | 30000 | HTTP request timeout in milliseconds (30 seconds) |
+| `CONNECTION_TIMEOUT` | 20000 | Socket connection timeout in milliseconds (20 seconds) |
+| `MAX_CONNECTIONS` | 1000 | Maximum concurrent connections allowed |
+
+**Timeout Tuning Guidelines:**
+- **Slow networks**: Increase both timeouts (e.g., 60000ms / 60 seconds)
+- **Fast networks**: Decrease for quicker failure detection (e.g., 10000ms / 10 seconds)
+- **Large file transfers**: Increase `REQUEST_TIMEOUT` significantly
+- **High traffic**: Adjust `MAX_CONNECTIONS` based on system resources
 
 ## Usage
 
@@ -98,9 +147,9 @@ node proxy.js
 
 #### Chrome/Edge:
 
-1. Go to Settings → System → Open your computer's proxy settings
-2. Set the HTTP and HTTPS proxy to `localhost:8080` (or your custom port)
-3. Enter the username and password when prompted
+1. Go to Settings → System → Open proxy settings
+2. Set HTTP and HTTPS proxy to `localhost:8080`
+3. Enter your configured username and password
 
 #### Firefox:
 
@@ -108,93 +157,132 @@ node proxy.js
 2. Select "Manual proxy configuration"
 3. Set HTTP Proxy to `localhost` and Port to `8080`
 4. Check "Also use this proxy for HTTPS"
-5. Click "OK"
-6. Enter the username and password when prompted
+5. Enter your configured credentials
 
 ### Device Configuration
 
 For mobile devices or other computers:
 
-1. Find your Windows machine's IP address (run `ipconfig` in command prompt)
-2. On the client device, set the proxy to `your-windows-ip:8080`
-3. Enter the authentication credentials
+1. Find your machine's IP address:
+   - macOS/Linux: `ifconfig` or `ip addr`
+   - Windows: `ipconfig`
+2. On the client device, set proxy to `your-ip:8080`
+3. Enter your authentication credentials
 
-## Windows Firewall Configuration
+## Health Check Endpoint
 
-If other devices can't connect to your proxy server, you may need to allow the port through Windows Firewall:
+The server exposes a health check endpoint at `GET /health`:
 
-1. Open Windows Defender Firewall with Advanced Security
-2. Click "Inbound Rules" → "New Rule"
-3. Select "Port" → "Next"
-4. Select "TCP" and enter your proxy port (default: 8080)
-5. Select "Allow the connection" → "Next"
-6. Check all network types → "Next"
-7. Name the rule "Proxy Server" → "Finish"
+```bash
+curl http://localhost:8080/health
+```
+
+Response:
+```json
+{
+  "status": "ok",
+  "uptime": 123.456,
+  "timestamp": "2026-02-11T07:45:00.000Z"
+}
+```
+
+Use this endpoint for:
+- Load balancer health checks
+- Monitoring systems
+- Container orchestration (Docker, Kubernetes)
+
+## Security Features
+
+### Input Validation
+- URL validation for all proxy requests
+- Header sanitization
+- Request size limits
+
+### Secure Logging
+- Passwords are NEVER logged
+- Sensitive data is masked in logs
+- Async logging prevents blocking
+
+## Project Structure
+
+```
+proxy-server/
+├── src/
+│   ├── server.js              # Main entry point
+│   ├── config.js              # Configuration loading and validation
+│   ├── logger.js              # Async logging utilities
+│   ├── auth.js                # Authentication
+│   └── handlers/
+│       ├── http.js            # HTTP proxy handler
+│       ├── https.js           # HTTPS CONNECT handler
+│       └── websocket.js       # WebSocket upgrade handler
+├── test/
+│   ├── config.test.js         # Configuration tests
+│   └── auth.test.js           # Authentication tests
+├── logs/                      # Log files directory
+├── .env                       # Configuration file
+├── package.json
+├── eslint.config.js           # ESLint configuration
+├── jest.config.js             # Jest configuration
+└── README.md
+```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **"Node.js is not installed or not in PATH"**
+1. **"AUTH_ENABLED is true but PROXY_USERNAME or PROXY_PASSWORD is not set"**
+   - Edit `.env` and set valid credentials
+   - Username: minimum 3 characters
+   - Password: minimum 8 characters
 
-   - Download and install Node.js from [https://nodejs.org/](https://nodejs.org/)
-   - Restart your computer after installation
+2. **"Invalid PORT" error**
+   - Port must be a number between 1 and 65535
+   - Check `.env` file for typos
 
-2. **"Failed to install dependencies"**
+3. **"EADDRINUSE" error**
+   - Port is already in use
+   - Change `PORT` in `.env` or stop the conflicting process
+   - Find process: `lsof -i :8080` (macOS/Linux) or `netstat -ano | findstr :8080` (Windows)
 
-   - Ensure you have internet access
-   - Try running `npm install` manually in the proxy server directory
+4. **Can't connect from other devices**
+   - Check firewall settings
+   - Ensure device is on same network
+   - Verify IP address is correct
 
-3. **Can't connect to proxy server**
+5. **Authentication failures**
+   - Verify credentials match `.env` file
+   - Check for extra spaces in username/password
+   - Review logs in `logs/proxy.log`
 
-   - Check if the server is running
-   - Verify Windows Firewall settings
-   - Ensure client device is on the same network
-   - Check if port is already in use (try a different port in .env)
+## Logging
 
-4. **Authentication failures**
+Logs are written to `logs/{LOG_FILE}` in JSON format:
 
-   - Verify username and password in .env file
-   - Ensure client is entering credentials correctly
-
-### Logs
-
-The proxy server will output logs to the console, including:
-
-- Server startup information
-- Authentication attempts
-- Error messages
-- Connection details
-
-## Security Considerations
-
-- **Change default credentials**: Always update the default username and password in the .env file
-- **Use HTTPS**: For production use, consider setting up SSL/TLS for the proxy server
-- **Network isolation**: Only expose the proxy server to trusted networks
-- **Monitoring**: Keep an eye on proxy server logs for unusual activity
-- **Port forwarding**: Be cautious about forwarding ports through routers to the proxy server
-
-## Cross-Platform Usage
-
-While this proxy server is optimized for Windows, it can also be used on other platforms:
-
-### macOS/Linux
-
-```bash
-# Install dependencies
-npm install
-
-# Start the proxy server
-node proxy.js
+```json
+{
+  "timestamp": "2026-02-11T07:45:00.000Z",
+  "level": "info",
+  "message": "HTTP request received",
+  "details": {
+    "clientIp": "192.168.1.100",
+    "code": "REQ"
+  }
+}
 ```
 
-## Files
+Log levels:
+- **error**: Critical errors only
+- **warn**: Warnings and errors
+- **info**: General information (recommended)
+- **debug**: Detailed diagnostic information
 
-- `proxy.js` - Main proxy server code
-- `package.json` - Project configuration and dependencies
-- `.env` - Configuration file
-- `start.bat` - Windows startup script
-- `README.md` - This documentation
+## Performance
+
+- **Async I/O**: Non-blocking file operations
+- **Event-driven**: Efficient connection handling
+- **Low memory footprint**: Minimal dependencies
+- **Graceful shutdown**: Cleanly closes connections
 
 ## License
 
@@ -202,8 +290,17 @@ MIT License - see LICENSE file for details
 
 ## Contributing
 
-Feel free to submit issues or pull requests to improve this proxy server.
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Write tests for new features
+4. Ensure `npm test` and `npm run lint` pass
+5. Submit a pull request
 
 ## Support
 
-If you encounter any issues, please check the troubleshooting section or create an issue in the repository.
+If you encounter issues:
+1. Check the troubleshooting section above
+2. Review logs in `logs/proxy.log`
+3. Run with `LOG_LEVEL=debug` for detailed information
+4. Create an issue with logs and configuration (redact credentials!)
