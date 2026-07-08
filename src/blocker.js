@@ -1,64 +1,75 @@
 const fs = require('fs');
 const path = require('path');
-const net = require('net');
 
 const BLOCKS_FILE = path.join(__dirname, '..', 'blocks.json');
 
 const state = {
-  ips: [],
+  sourceIps: [],
+  targetIps: [],
   ports: []
 };
 
 function load() {
   try {
     const data = JSON.parse(fs.readFileSync(BLOCKS_FILE, 'utf8'));
-    state.ips = data.ips || [];
+    state.sourceIps = data.sourceIps || [];
+    state.targetIps = data.targetIps || [];
     state.ports = data.ports || [];
   } catch (err) {
-    state.ips = [];
+    state.sourceIps = [];
+    state.targetIps = [];
     state.ports = [];
     save();
   }
 }
 
 function save() {
-  fs.writeFileSync(BLOCKS_FILE, JSON.stringify({ ips: state.ips, ports: state.ports }, null, 2) + '\n');
+  fs.writeFileSync(BLOCKS_FILE, JSON.stringify({
+    sourceIps: state.sourceIps,
+    targetIps: state.targetIps,
+    ports: state.ports
+  }, null, 2) + '\n');
 }
 
 function ipToInt(ip) {
   const parts = ip.split('.');
   if (parts.length !== 4) return null;
-  return parts.reduce((acc, octet) => {
+  let result = 0;
+  for (const octet of parts) {
     const n = parseInt(octet, 10);
     if (isNaN(n) || n < 0 || n > 255) return null;
-    return acc === null ? null : (acc << 8) + n;
-  }, 0);
+    result = (result << 8) + n;
+  }
+  return result;
 }
 
-function ipInCIDR(ip, cidr) {
-  const [range, bits] = cidr.split('/');
-  const mask = bits ? parseInt(bits, 10) : 32;
-  if (isNaN(mask) || mask < 0 || mask > 32) return false;
-  const ipInt = ipToInt(ip);
-  const rangeInt = ipToInt(range);
-  if (ipInt === null || rangeInt === null) return false;
-  const shifted = 32 - mask;
-  return (ipInt >>> shifted) === (rangeInt >>> shifted);
+function matchIp(ip, pattern) {
+  if (pattern.includes('/')) {
+    const [range, bits] = pattern.split('/');
+    const mask = parseInt(bits, 10);
+    if (isNaN(mask) || mask < 0 || mask > 32) return false;
+    const ipInt = ipToInt(ip);
+    const rangeInt = ipToInt(range);
+    if (ipInt === null || rangeInt === null) return false;
+    const shifted = 32 - mask;
+    return (ipInt >>> shifted) === (rangeInt >>> shifted);
+  }
+  return ip === pattern;
 }
 
 function isBlocked(clientIp, targetHost, targetPort) {
   const clientIpStr = clientIp ? clientIp.replace(/^::ffff:/, '') : '';
   const targetIpStr = targetHost ? targetHost.replace(/^::ffff:/, '') : '';
 
-  for (const blocked of state.ips) {
-    if (blocked.includes('/')) {
-      if (ipInCIDR(clientIpStr, blocked) || ipInCIDR(targetIpStr, blocked)) {
-        return { blocked: true, reason: 'IP ' + blocked + ' is blocked' };
-      }
-    } else {
-      if (clientIpStr === blocked || targetIpStr === blocked) {
-        return { blocked: true, reason: 'IP ' + blocked + ' is blocked' };
-      }
+  for (const blocked of state.sourceIps) {
+    if (matchIp(clientIpStr, blocked)) {
+      return { blocked: true, reason: 'Source IP ' + blocked + ' is blocked' };
+    }
+  }
+
+  for (const blocked of state.targetIps) {
+    if (matchIp(targetIpStr, blocked)) {
+      return { blocked: true, reason: 'Target IP ' + blocked + ' is blocked' };
     }
   }
 
@@ -70,18 +81,34 @@ function isBlocked(clientIp, targetHost, targetPort) {
 }
 
 function getBlocks() {
-  return { ips: [...state.ips], ports: [...state.ports] };
+  return {
+    sourceIps: [...state.sourceIps],
+    targetIps: [...state.targetIps],
+    ports: [...state.ports]
+  };
 }
 
-function addIp(ip) {
-  if (!state.ips.includes(ip)) {
-    state.ips.push(ip);
+function addSourceIp(ip) {
+  if (!state.sourceIps.includes(ip)) {
+    state.sourceIps.push(ip);
     save();
   }
 }
 
-function removeIp(ip) {
-  state.ips = state.ips.filter(i => i !== ip);
+function removeSourceIp(ip) {
+  state.sourceIps = state.sourceIps.filter(i => i !== ip);
+  save();
+}
+
+function addTargetIp(ip) {
+  if (!state.targetIps.includes(ip)) {
+    state.targetIps.push(ip);
+    save();
+  }
+}
+
+function removeTargetIp(ip) {
+  state.targetIps = state.targetIps.filter(i => i !== ip);
   save();
 }
 
@@ -101,4 +128,9 @@ function removePort(port) {
 
 load();
 
-module.exports = { isBlocked, getBlocks, addIp, removeIp, addPort, removePort };
+module.exports = {
+  isBlocked, getBlocks,
+  addSourceIp, removeSourceIp,
+  addTargetIp, removeTargetIp,
+  addPort, removePort
+};

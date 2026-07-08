@@ -73,7 +73,7 @@ th { color: #94a3b8; font-weight: 500; position: sticky; top: 0; background: #1e
 <div class="header">
 <h1>Proxy Admin</h1>
 <div style="display:flex;align-items:center;gap:12px;">
-<a href="/admin/blocks" style="color:#94a3b8;text-decoration:none;font-size:14px;">Block Rules</a>
+<a href="/admin/blocks" style="display:inline-block;padding:6px 14px;background:#dc2626;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:500;">Block Rules</a>
 <span id="statusBadge" class="status-badge enabled">Enabled</span>
 </div>
 </div>
@@ -257,8 +257,49 @@ async function toggleProxy() {
   res.end(html);
 }
 
+function handleBlocksApi(req, res) {
+  // Body parsing helper
+  const readBody = () => new Promise((resolve) => {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try { resolve(JSON.parse(body)); } catch (e) { resolve({}); }
+    });
+  });
+
+  if (req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(blocker.getBlocks()));
+    return;
+  }
+
+  readBody().then(body => {
+    if (req.url.includes('/source-ip')) {
+      if (body.ip) {
+        if (req.method === 'POST') blocker.addSourceIp(body.ip);
+        else blocker.removeSourceIp(body.ip);
+        log('info', req.method === 'POST' ? 'Source IP blocked' : 'Source IP unblocked', { ip: body.ip });
+      }
+    } else if (req.url.includes('/target-ip')) {
+      if (body.ip) {
+        if (req.method === 'POST') blocker.addTargetIp(body.ip);
+        else blocker.removeTargetIp(body.ip);
+        log('info', req.method === 'POST' ? 'Target IP blocked' : 'Target IP unblocked', { ip: body.ip });
+      }
+    } else if (req.url.includes('/port')) {
+      const port = parseInt(body.port, 10);
+      if (!isNaN(port)) {
+        if (req.method === 'POST') blocker.addPort(port);
+        else blocker.removePort(port);
+        log('info', req.method === 'POST' ? 'Port blocked' : 'Port unblocked', { port });
+      }
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(blocker.getBlocks()));
+  });
+}
+
 function serveBlocksPage(res) {
-  const blocks = blocker.getBlocks();
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -271,8 +312,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .container { max-width: 700px; margin: 0 auto; }
 .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
 .header h1 { font-size: 24px; font-weight: 600; }
-.back-link { color: #94a3b8; text-decoration: none; font-size: 14px; }
-.back-link:hover { color: #e2e8f0; }
+.back-link { display:inline-block; padding:6px 14px; background:#334155; color:#e2e8f0; border-radius:6px; text-decoration:none; font-size:13px; }
+.back-link:hover { background: #475569; }
 .section { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
 .section h2 { font-size: 14px; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 16px; }
 .block-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #334155; font-size: 14px; }
@@ -284,23 +325,36 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .add-row input:focus { border-color: #3b82f6; }
 .add-row button { padding: 8px 16px; border: none; border-radius: 6px; background: #3b82f6; color: #fff; font-size: 14px; cursor: pointer; }
 .add-row button:hover { background: #2563eb; }
+.add-row button:active { background: #1d4ed8; }
 .empty { text-align: center; color: #64748b; font-size: 14px; padding: 16px 0; }
+.help-text { font-size: 12px; color: #64748b; margin-top: 6px; }
 </style>
 </head>
 <body>
 <div class="container">
 <div class="header">
 <h1>Block Rules</h1>
-<a href="/admin" class="back-link">&larr; Back to Dashboard</a>
+<a href="/admin" class="back-link">&larr; Dashboard</a>
 </div>
 
 <div class="section">
-<h2>Blocked IPs &amp; CIDR Ranges</h2>
-<div id="ipList"></div>
+<h2>Blocked Source IPs (Client)</h2>
+<div id="sourceIpList"></div>
 <div class="add-row">
-<input id="ipInput" type="text" placeholder="e.g. 10.0.0.1 or 192.168.0.0/16">
-<button onclick="addIp()">Add</button>
+<input id="sourceIpInput" type="text" placeholder="e.g. 10.0.0.1 or 192.168.0.0/16">
+<button id="addSourceBtn">Add</button>
 </div>
+<div class="help-text">Blocks requests coming FROM this IP address</div>
+</div>
+
+<div class="section">
+<h2>Blocked Target IPs (Destination)</h2>
+<div id="targetIpList"></div>
+<div class="add-row">
+<input id="targetIpInput" type="text" placeholder="e.g. 203.0.113.5 or 10.0.0.0/8">
+<button id="addTargetBtn">Add</button>
+</div>
+<div class="help-text">Blocks requests going TO this IP address</div>
 </div>
 
 <div class="section">
@@ -308,69 +362,76 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 <div id="portList"></div>
 <div class="add-row">
 <input id="portInput" type="text" placeholder="e.g. 25">
-<button onclick="addPort()">Add</button>
+<button id="addPortBtn">Add</button>
 </div>
+<div class="help-text">Blocks requests to this destination port</div>
 </div>
 </div>
 <script>
+function renderList(containerId, items, labelFn, removeFn) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  if (items.length === 0) {
+    el.innerHTML = '<div class="empty">None</div>';
+    return;
+  }
+  for (let i = 0; i < items.length; i++) {
+    const div = document.createElement('div');
+    div.className = 'block-item';
+    const label = typeof labelFn === 'function' ? labelFn(items[i]) : items[i];
+    div.innerHTML = '<span>' + label + '</span><button class="remove-btn" data-idx="' + i + '">Remove</button>';
+    div.querySelector('.remove-btn').onclick = function() { removeFn(items[i]); };
+    el.appendChild(div);
+  }
+}
+
 async function loadBlocks() {
-  const res = await fetch('/admin/api/blocks');
-  const data = await res.json();
-  const ipList = document.getElementById('ipList');
-  const portList = document.getElementById('portList');
-
-  ipList.innerHTML = '';
-  if (data.ips.length === 0) {
-    ipList.innerHTML = '<div class="empty">No IPs blocked</div>';
-  } else {
-    for (const ip of data.ips) {
-      const div = document.createElement('div');
-      div.className = 'block-item';
-      div.innerHTML = '<span>' + ip + '</span><button class="remove-btn" onclick="removeIp(\'' + ip.replace(/'/g, "\\'") + '\')">Remove</button>';
-      ipList.appendChild(div);
-    }
-  }
-
-  portList.innerHTML = '';
-  if (data.ports.length === 0) {
-    portList.innerHTML = '<div class="empty">No ports blocked</div>';
-  } else {
-    for (const port of data.ports) {
-      const div = document.createElement('div');
-      div.className = 'block-item';
-      div.innerHTML = '<span>Port ' + port + '</span><button class="remove-btn" onclick="removePort(' + port + ')">Remove</button>';
-      portList.appendChild(div);
-    }
+  try {
+    const res = await fetch('/admin/api/blocks');
+    const data = await res.json();
+    renderList('sourceIpList', data.sourceIps || [], null, function(ip) {
+      fetch('/admin/api/blocks/source-ip', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip: ip }) }).then(loadBlocks);
+    });
+    renderList('targetIpList', data.targetIps || [], null, function(ip) {
+      fetch('/admin/api/blocks/target-ip', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip: ip }) }).then(loadBlocks);
+    });
+    renderList('portList', data.ports || [], function(p) { return 'Port ' + p; }, function(port) {
+      fetch('/admin/api/blocks/port', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ port: port }) }).then(loadBlocks);
+    });
+  } catch (err) {
+    console.error('Failed to load blocks:', err);
   }
 }
 
-async function addIp() {
-  const input = document.getElementById('ipInput');
-  const ip = input.value.trim();
+document.getElementById('addSourceBtn').onclick = function() {
+  var input = document.getElementById('sourceIpInput');
+  var ip = input.value.trim();
   if (!ip) return;
-  await fetch('/admin/api/blocks/ip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip }) });
-  input.value = '';
-  loadBlocks();
-}
+  input.disabled = true;
+  fetch('/admin/api/blocks/source-ip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip: ip }) })
+    .then(function() { input.value = ''; input.disabled = false; loadBlocks(); })
+    .catch(function() { input.disabled = false; });
+};
 
-async function removeIp(ip) {
-  await fetch('/admin/api/blocks/ip', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip }) });
-  loadBlocks();
-}
+document.getElementById('addTargetBtn').onclick = function() {
+  var input = document.getElementById('targetIpInput');
+  var ip = input.value.trim();
+  if (!ip) return;
+  input.disabled = true;
+  fetch('/admin/api/blocks/target-ip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip: ip }) })
+    .then(function() { input.value = ''; input.disabled = false; loadBlocks(); })
+    .catch(function() { input.disabled = false; });
+};
 
-async function addPort() {
-  const input = document.getElementById('portInput');
-  const port = input.value.trim();
+document.getElementById('addPortBtn').onclick = function() {
+  var input = document.getElementById('portInput');
+  var port = input.value.trim();
   if (!port) return;
-  await fetch('/admin/api/blocks/port', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ port: parseInt(port) }) });
-  input.value = '';
-  loadBlocks();
-}
-
-async function removePort(port) {
-  await fetch('/admin/api/blocks/port', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ port }) });
-  loadBlocks();
-}
+  input.disabled = true;
+  fetch('/admin/api/blocks/port', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ port: parseInt(port) }) })
+    .then(function() { input.value = ''; input.disabled = false; loadBlocks(); })
+    .catch(function() { input.disabled = false; });
+};
 
 loadBlocks();
 </script>
@@ -422,69 +483,8 @@ function handleAdmin(req, res) {
     return;
   }
 
-  if (parsedUrl.pathname === '/admin/api/blocks') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(blocker.getBlocks()));
-    return;
-  }
-
-  if (parsedUrl.pathname === '/admin/api/blocks/ip' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
-      const { ip } = JSON.parse(body);
-      if (ip) {
-        blocker.addIp(ip);
-        log('info', 'IP blocked', { ip });
-      }
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(blocker.getBlocks()));
-    });
-    return;
-  }
-
-  if (parsedUrl.pathname === '/admin/api/blocks/ip' && req.method === 'DELETE') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
-      const { ip } = JSON.parse(body);
-      if (ip) {
-        blocker.removeIp(ip);
-        log('info', 'IP unblocked', { ip });
-      }
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(blocker.getBlocks()));
-    });
-    return;
-  }
-
-  if (parsedUrl.pathname === '/admin/api/blocks/port' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
-      const { port } = JSON.parse(body);
-      if (port !== undefined) {
-        blocker.addPort(port);
-        log('info', 'Port blocked', { port });
-      }
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(blocker.getBlocks()));
-    });
-    return;
-  }
-
-  if (parsedUrl.pathname === '/admin/api/blocks/port' && req.method === 'DELETE') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
-      const { port } = JSON.parse(body);
-      if (port !== undefined) {
-        blocker.removePort(port);
-        log('info', 'Port unblocked', { port });
-      }
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(blocker.getBlocks()));
-    });
+  if (parsedUrl.pathname.startsWith('/admin/api/blocks')) {
+    handleBlocksApi(req, res);
     return;
   }
 

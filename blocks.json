@@ -1,4 +1,5 @@
 {
-  "ips": [],
+  "sourceIps": [],
+  "targetIps": [],
   "ports": []
 }
