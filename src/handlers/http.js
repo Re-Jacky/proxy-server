@@ -22,7 +22,16 @@ function handleHTTPProxy(req, res) {
   metrics.recordRequest();
   metrics.connectionOpen();
   
+  let cleanedUp = false;
+  let bytesSent = 0;
+  function cleanup() {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    metrics.connectionClose();
+  }
+  
   if (!proxyState.enabled) {
+    cleanup();
     res.writeHead(503, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Proxy is disabled' }));
     return;
@@ -51,6 +60,8 @@ function handleHTTPProxy(req, res) {
   };
 
   delete options.headers['proxy-authorization'];
+
+  req.on('data', (chunk) => { bytesSent += chunk.length; });
 
   const proxyReq = http.request(options, (proxyRes) => {
     log('info', 'HTTP response received', {
@@ -94,8 +105,8 @@ function handleHTTPProxy(req, res) {
     if (!res.headersSent) {
       res.writeHead(500);
       res.end('Proxy error');
-      metrics.connectionClose();
     }
+    cleanup();
   });
 
   proxyReq.on('timeout', () => {
@@ -108,8 +119,8 @@ function handleHTTPProxy(req, res) {
     if (!res.headersSent) {
       res.writeHead(504);
       res.end('Gateway Timeout');
-      metrics.connectionClose();
     }
+    cleanup();
   });
 
   proxyReq.on('socket', () => {
@@ -120,8 +131,9 @@ function handleHTTPProxy(req, res) {
     });
   });
 
-  let bytesSent = 0;
-  req.on('data', (chunk) => { bytesSent += chunk.length; });
+  // Clean up on client disconnect / response complete
+  res.on('close', cleanup);
+
   req.pipe(proxyReq);
 }
 

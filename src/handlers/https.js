@@ -6,8 +6,6 @@ const metrics = require('../metrics');
 
 function handleHTTPSProxy(req, clientSocket, head) {
   const clientIp = clientSocket.remoteAddress;
-  metrics.connectionOpen();
-  let bytesUp = 0, bytesDown = 0;
   const [hostname, port] = req.url.split(':');
   const targetPort = port || 443;
   
@@ -25,6 +23,17 @@ function handleHTTPSProxy(req, clientSocket, head) {
     clientSocket.write(`HTTP/${req.httpVersion} 503 Service Unavailable\r\n\r\n`);
     clientSocket.end();
     return;
+  }
+  
+  metrics.connectionOpen();
+  
+  let cleanedUp = false;
+  let bytesUp = 0, bytesDown = 0;
+  function cleanup() {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    metrics.recordBytes(bytesUp, bytesDown);
+    metrics.connectionClose();
   }
   
   const serverOptions = {
@@ -86,7 +95,7 @@ function handleHTTPSProxy(req, clientSocket, head) {
     clientSocket.write('\r\n');
     clientSocket.write(err.message);
     clientSocket.end();
-    metrics.connectionClose();
+    cleanup();
   });
 
   serverSocket.on('timeout', () => {
@@ -98,7 +107,7 @@ function handleHTTPSProxy(req, clientSocket, head) {
     });
     serverSocket.destroy();
     clientSocket.end();
-    metrics.connectionClose();
+    cleanup();
   });
 
   clientSocket.on('error', (err) => {
@@ -116,7 +125,7 @@ function handleHTTPSProxy(req, clientSocket, head) {
     });
     
     serverSocket.end();
-    metrics.connectionClose();
+    cleanup();
   });
 
   serverSocket.on('close', () => {
@@ -125,8 +134,7 @@ function handleHTTPSProxy(req, clientSocket, head) {
       targetHost: hostname,
       targetPort: targetPort
     });
-    metrics.recordBytes(bytesUp, bytesDown);
-    metrics.connectionClose();
+    cleanup();
   });
 
   clientSocket.on('close', () => {
@@ -135,8 +143,7 @@ function handleHTTPSProxy(req, clientSocket, head) {
       targetHost: hostname,
       targetPort: targetPort
     });
-    metrics.recordBytes(bytesUp, bytesDown);
-    metrics.connectionClose();
+    cleanup();
   });
 }
 

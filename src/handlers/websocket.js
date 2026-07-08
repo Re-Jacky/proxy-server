@@ -7,8 +7,6 @@ const metrics = require('../metrics');
 
 function handleWebSocketUpgrade(req, socket) {
   const clientIp = socket.remoteAddress;
-  metrics.connectionOpen();
-  let bytesUp = 0, bytesDown = 0;
   const parsedUrl = url.parse(req.url);
   const targetHost = parsedUrl.hostname;
   const targetPort = parsedUrl.port || (parsedUrl.protocol === 'wss:' ? 443 : 80);
@@ -27,6 +25,17 @@ function handleWebSocketUpgrade(req, socket) {
     socket.write(`HTTP/${req.httpVersion} 503 Service Unavailable\r\n\r\n`);
     socket.end();
     return;
+  }
+  
+  metrics.connectionOpen();
+  
+  let cleanedUp = false;
+  let bytesUp = 0, bytesDown = 0;
+  function cleanup() {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    metrics.recordBytes(bytesUp, bytesDown);
+    metrics.connectionClose();
   }
   
   log('info', 'WebSocket connection request', {
@@ -89,7 +98,7 @@ function handleWebSocketUpgrade(req, socket) {
     });
     
     socket.end();
-    metrics.connectionClose();
+    cleanup();
   });
 
   serverSocket.on('timeout', () => {
@@ -101,7 +110,7 @@ function handleWebSocketUpgrade(req, socket) {
     });
     serverSocket.destroy();
     socket.end();
-    metrics.connectionClose();
+    cleanup();
   });
 
   socket.on('error', (err) => {
@@ -119,7 +128,7 @@ function handleWebSocketUpgrade(req, socket) {
     });
     
     serverSocket.end();
-    metrics.connectionClose();
+    cleanup();
   });
 
   serverSocket.on('close', () => {
@@ -128,8 +137,7 @@ function handleWebSocketUpgrade(req, socket) {
       targetHost: targetHost,
       targetPort: targetPort
     });
-    metrics.recordBytes(bytesUp, bytesDown);
-    metrics.connectionClose();
+    cleanup();
   });
 
   socket.on('close', () => {
@@ -138,8 +146,7 @@ function handleWebSocketUpgrade(req, socket) {
       targetHost: targetHost,
       targetPort: targetPort
     });
-    metrics.recordBytes(bytesUp, bytesDown);
-    metrics.connectionClose();
+    cleanup();
   });
 }
 
