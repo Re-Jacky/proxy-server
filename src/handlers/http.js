@@ -23,6 +23,14 @@ function handleHTTPProxy(req, res) {
   const check = blocker.isBlocked(clientIp, parsedUrl.hostname, parsedUrl.port || 80);
   if (check.blocked) {
     log('warn', 'Blocked request', { clientIp, targetHost: parsedUrl.hostname, reason: check.reason });
+    metrics.logRequest({
+      sourceIp: clientIp,
+      method: req.method,
+      targetHost: parsedUrl.hostname,
+      targetPort: parsedUrl.port || 80,
+      protocol: 'HTTP',
+      statusCode: 403
+    });
     res.writeHead(403, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: check.reason }));
     return;
@@ -40,6 +48,14 @@ function handleHTTPProxy(req, res) {
   }
   
   if (!proxyState.enabled) {
+    metrics.logRequest({
+      sourceIp: clientIp,
+      method: req.method,
+      targetHost: parsedUrl.hostname,
+      targetPort: parsedUrl.port || 80,
+      protocol: 'HTTP',
+      statusCode: 503
+    });
     cleanup();
     res.writeHead(503, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Proxy is disabled' }));

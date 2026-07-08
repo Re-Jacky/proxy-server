@@ -23,12 +23,28 @@ function handleHTTPSProxy(req, clientSocket, head) {
   const check = blocker.isBlocked(clientIp, hostname, targetPort);
   if (check.blocked) {
     log('warn', 'Blocked HTTPS CONNECT', { clientIp, targetHost: hostname, reason: check.reason });
+    metrics.logRequest({
+      sourceIp: clientIp,
+      method: 'CONNECT',
+      targetHost: hostname,
+      targetPort: targetPort,
+      protocol: 'HTTPS',
+      statusCode: 403
+    });
     clientSocket.write(`HTTP/${req.httpVersion} 403 Forbidden\r\nContent-Type: application/json\r\n\r\n{"error":"${check.reason}"}`);
     clientSocket.end();
     return;
   }
 
   if (!proxyState.enabled) {
+    metrics.logRequest({
+      sourceIp: clientIp,
+      method: 'CONNECT',
+      targetHost: hostname,
+      targetPort: targetPort,
+      protocol: 'HTTPS',
+      statusCode: 503
+    });
     clientSocket.write(`HTTP/${req.httpVersion} 503 Service Unavailable\r\n\r\n`);
     clientSocket.end();
     return;

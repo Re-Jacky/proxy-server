@@ -25,12 +25,28 @@ function handleWebSocketUpgrade(req, socket) {
   const check = blocker.isBlocked(clientIp, targetHost, targetPort);
   if (check.blocked) {
     log('warn', 'Blocked WebSocket', { clientIp, targetHost, reason: check.reason });
+    metrics.logRequest({
+      sourceIp: clientIp,
+      method: 'WS',
+      targetHost: targetHost,
+      targetPort: targetPort,
+      protocol: 'WebSocket',
+      statusCode: 403
+    });
     socket.write(`HTTP/${req.httpVersion} 403 Forbidden\r\nContent-Type: application/json\r\n\r\n{"error":"${check.reason}"}`);
     socket.end();
     return;
   }
 
   if (!proxyState.enabled) {
+    metrics.logRequest({
+      sourceIp: clientIp,
+      method: 'WS',
+      targetHost: targetHost,
+      targetPort: targetPort,
+      protocol: 'WebSocket',
+      statusCode: 503
+    });
     socket.write(`HTTP/${req.httpVersion} 503 Service Unavailable\r\n\r\n`);
     socket.end();
     return;
