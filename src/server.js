@@ -84,12 +84,14 @@ httpServer.on('connect', (req, clientSocket, head) => {
   }
 
   if (!proxyState.enabled) {
+    const [shost, sport] = req.url.split(':');
+    const sslPort = parseInt(sport || '443', 10);
     logRequest({
       sourceIp: clientIp,
-      method: 'CONNECT',
-      targetHost: req.url.split(':')[0],
-      targetPort: parseInt(req.url.split(':')[1] || '443', 10),
-      protocol: 'HTTPS',
+      method: sslPort === 443 ? 'WSS' : 'CONNECT',
+      targetHost: shost,
+      targetPort: sslPort,
+      protocol: sslPort === 443 ? 'WSS' : 'HTTPS',
       statusCode: 503
     });
     clientSocket.write(`HTTP/${req.httpVersion} 503 Service Unavailable\r\n\r\n`);
