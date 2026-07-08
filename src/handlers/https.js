@@ -51,7 +51,16 @@ function handleHTTPSProxy(req, clientSocket, head) {
   }
   
   metrics.connectionOpen();
-  
+
+  metrics.logRequest({
+    sourceIp: clientIp,
+    method: 'CONNECT',
+    targetHost: hostname,
+    targetPort: targetPort,
+    protocol: 'HTTPS',
+    statusCode: 200
+  });
+
   let cleanedUp = false;
   let bytesUp = 0, bytesDown = 0;
   function cleanup() {
@@ -92,15 +101,6 @@ function handleHTTPSProxy(req, clientSocket, head) {
       targetPort: targetPort
     });
     
-    metrics.logRequest({
-      sourceIp: clientIp,
-      method: 'CONNECT',
-      targetHost: hostname,
-      targetPort: targetPort,
-      protocol: 'HTTPS',
-      statusCode: 200
-    });
-    
     clientSocket.write(`HTTP/${req.httpVersion} 200 Connection Established\r\n\r\n`);
     serverSocket.write(head);
     serverSocket.on('data', (chunk) => { bytesDown += chunk.length; });
@@ -123,15 +123,6 @@ function handleHTTPSProxy(req, clientSocket, head) {
       stack: err.stack
     });
     
-    metrics.logRequest({
-      sourceIp: clientIp,
-      method: 'CONNECT',
-      targetHost: hostname,
-      targetPort: targetPort,
-      protocol: 'HTTPS',
-      statusCode: 502
-    });
-    
     clientSocket.write(`HTTP/${req.httpVersion} 502 Bad Gateway\r\n`);
     clientSocket.write('Content-Type: text/plain\r\n');
     clientSocket.write(`Content-Length: ${err.message.length}\r\n`);
@@ -147,15 +138,6 @@ function handleHTTPSProxy(req, clientSocket, head) {
       code: 'HTTPS_TIMEOUT',
       targetHost: hostname,
       targetPort: targetPort
-    });
-    
-    metrics.logRequest({
-      sourceIp: clientIp,
-      method: 'CONNECT',
-      targetHost: hostname,
-      targetPort: targetPort,
-      protocol: 'HTTPS',
-      statusCode: 504
     });
     
     serverSocket.destroy();
