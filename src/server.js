@@ -5,6 +5,8 @@ const { authenticate } = require('./auth');
 const { handleHTTPProxy } = require('./handlers/http');
 const { handleHTTPSProxy } = require('./handlers/https');
 const { handleWebSocketUpgrade } = require('./handlers/websocket');
+const { handleAdmin } = require('./admin');
+const { adminAuthenticate } = require('./admin-auth');
 
 const startTime = Date.now();
 
@@ -28,6 +30,12 @@ function handleHealthCheck(req, res) {
 const httpServer = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/health') {
     handleHealthCheck(req, res);
+    return;
+  }
+
+  if (req.url.startsWith('/admin')) {
+    if (!adminAuthenticate(req, res)) return;
+    handleAdmin(req, res);
     return;
   }
 
