@@ -1,9 +1,13 @@
 const net = require('net');
 const { log } = require('../logger');
 const { CONNECTION_TIMEOUT } = require('../config');
+const proxyState = require('../proxy-state');
+const metrics = require('../metrics');
 
 function handleHTTPSProxy(req, clientSocket, head) {
   const clientIp = clientSocket.remoteAddress;
+  metrics.connectionOpen();
+  let bytesUp = 0, bytesDown = 0;
   const [hostname, port] = req.url.split(':');
   const targetPort = port || 443;
   
@@ -13,6 +17,12 @@ function handleHTTPSProxy(req, clientSocket, head) {
       url: req.url
     });
     clientSocket.write(`HTTP/${req.httpVersion} 400 Bad Request\r\n\r\n`);
+    clientSocket.end();
+    return;
+  }
+  
+  if (!proxyState.enabled) {
+    clientSocket.write(`HTTP/${req.httpVersion} 503 Service Unavailable\r\n\r\n`);
     clientSocket.end();
     return;
   }
@@ -50,6 +60,8 @@ function handleHTTPSProxy(req, clientSocket, head) {
     
     clientSocket.write(`HTTP/${req.httpVersion} 200 Connection Established\r\n\r\n`);
     serverSocket.write(head);
+    serverSocket.on('data', (chunk) => { bytesDown += chunk.length; });
+    clientSocket.on('data', (chunk) => { bytesUp += chunk.length; });
     serverSocket.pipe(clientSocket);
     clientSocket.pipe(serverSocket);
   });
@@ -74,6 +86,7 @@ function handleHTTPSProxy(req, clientSocket, head) {
     clientSocket.write('\r\n');
     clientSocket.write(err.message);
     clientSocket.end();
+    metrics.connectionClose();
   });
 
   serverSocket.on('timeout', () => {
@@ -85,6 +98,7 @@ function handleHTTPSProxy(req, clientSocket, head) {
     });
     serverSocket.destroy();
     clientSocket.end();
+    metrics.connectionClose();
   });
 
   clientSocket.on('error', (err) => {
@@ -102,6 +116,7 @@ function handleHTTPSProxy(req, clientSocket, head) {
     });
     
     serverSocket.end();
+    metrics.connectionClose();
   });
 
   serverSocket.on('close', () => {
@@ -110,6 +125,8 @@ function handleHTTPSProxy(req, clientSocket, head) {
       targetHost: hostname,
       targetPort: targetPort
     });
+    metrics.recordBytes(bytesUp, bytesDown);
+    metrics.connectionClose();
   });
 
   clientSocket.on('close', () => {
@@ -118,6 +135,8 @@ function handleHTTPSProxy(req, clientSocket, head) {
       targetHost: hostname,
       targetPort: targetPort
     });
+    metrics.recordBytes(bytesUp, bytesDown);
+    metrics.connectionClose();
   });
 }
 

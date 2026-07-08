@@ -2,9 +2,13 @@ const net = require('net');
 const url = require('url');
 const { log } = require('../logger');
 const { CONNECTION_TIMEOUT } = require('../config');
+const proxyState = require('../proxy-state');
+const metrics = require('../metrics');
 
 function handleWebSocketUpgrade(req, socket) {
   const clientIp = socket.remoteAddress;
+  metrics.connectionOpen();
+  let bytesUp = 0, bytesDown = 0;
   const parsedUrl = url.parse(req.url);
   const targetHost = parsedUrl.hostname;
   const targetPort = parsedUrl.port || (parsedUrl.protocol === 'wss:' ? 443 : 80);
@@ -15,6 +19,12 @@ function handleWebSocketUpgrade(req, socket) {
       url: req.url
     });
     socket.write(`HTTP/${req.httpVersion} 400 Bad Request\r\n\r\n`);
+    socket.end();
+    return;
+  }
+  
+  if (!proxyState.enabled) {
+    socket.write(`HTTP/${req.httpVersion} 503 Service Unavailable\r\n\r\n`);
     socket.end();
     return;
   }
@@ -58,6 +68,8 @@ function handleWebSocketUpgrade(req, socket) {
     
     socket.write('\r\n');
 
+    serverSocket.on('data', (chunk) => { bytesDown += chunk.length; });
+    socket.on('data', (chunk) => { bytesUp += chunk.length; });
     serverSocket.pipe(socket);
     socket.pipe(serverSocket);
   });
@@ -77,6 +89,7 @@ function handleWebSocketUpgrade(req, socket) {
     });
     
     socket.end();
+    metrics.connectionClose();
   });
 
   serverSocket.on('timeout', () => {
@@ -88,6 +101,7 @@ function handleWebSocketUpgrade(req, socket) {
     });
     serverSocket.destroy();
     socket.end();
+    metrics.connectionClose();
   });
 
   socket.on('error', (err) => {
@@ -105,6 +119,7 @@ function handleWebSocketUpgrade(req, socket) {
     });
     
     serverSocket.end();
+    metrics.connectionClose();
   });
 
   serverSocket.on('close', () => {
@@ -113,6 +128,8 @@ function handleWebSocketUpgrade(req, socket) {
       targetHost: targetHost,
       targetPort: targetPort
     });
+    metrics.recordBytes(bytesUp, bytesDown);
+    metrics.connectionClose();
   });
 
   socket.on('close', () => {
@@ -121,6 +138,8 @@ function handleWebSocketUpgrade(req, socket) {
       targetHost: targetHost,
       targetPort: targetPort
     });
+    metrics.recordBytes(bytesUp, bytesDown);
+    metrics.connectionClose();
   });
 }
 

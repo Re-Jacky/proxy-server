@@ -2,6 +2,8 @@ const http = require('http');
 const url = require('url');
 const { log } = require('../logger');
 const { REQUEST_TIMEOUT } = require('../config');
+const proxyState = require('../proxy-state');
+const metrics = require('../metrics');
 
 function handleHTTPProxy(req, res) {
   const clientIp = req.socket.remoteAddress;
@@ -14,6 +16,15 @@ function handleHTTPProxy(req, res) {
     });
     res.writeHead(400);
     res.end('Bad Request: Invalid URL');
+    return;
+  }
+  
+  metrics.recordRequest();
+  metrics.connectionOpen();
+  
+  if (!proxyState.enabled) {
+    res.writeHead(503, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Proxy is disabled' }));
     return;
   }
   
@@ -58,6 +69,11 @@ function handleHTTPProxy(req, res) {
     });
     
     res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    let bytesReceived = 0;
+    proxyRes.on('data', (chunk) => { bytesReceived += chunk.length; });
+    proxyRes.on('end', () => {
+      metrics.recordBytes(bytesSent, bytesReceived);
+    });
     proxyRes.pipe(res);
   });
 
@@ -78,6 +94,7 @@ function handleHTTPProxy(req, res) {
     if (!res.headersSent) {
       res.writeHead(500);
       res.end('Proxy error');
+      metrics.connectionClose();
     }
   });
 
@@ -91,6 +108,7 @@ function handleHTTPProxy(req, res) {
     if (!res.headersSent) {
       res.writeHead(504);
       res.end('Gateway Timeout');
+      metrics.connectionClose();
     }
   });
 
@@ -102,6 +120,8 @@ function handleHTTPProxy(req, res) {
     });
   });
 
+  let bytesSent = 0;
+  req.on('data', (chunk) => { bytesSent += chunk.length; });
   req.pipe(proxyReq);
 }
 
