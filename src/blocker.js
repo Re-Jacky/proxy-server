@@ -4,31 +4,21 @@ const path = require('path');
 const BLOCKS_FILE = path.join(__dirname, '..', 'blocks.json');
 
 const state = {
-  sourceIps: [],
-  targetIps: [],
-  ports: []
+  rules: []
 };
 
 function load() {
   try {
     const data = JSON.parse(fs.readFileSync(BLOCKS_FILE, 'utf8'));
-    state.sourceIps = data.sourceIps || [];
-    state.targetIps = data.targetIps || [];
-    state.ports = data.ports || [];
+    state.rules = data.rules || [];
   } catch (err) {
-    state.sourceIps = [];
-    state.targetIps = [];
-    state.ports = [];
+    state.rules = [];
     save();
   }
 }
 
 function save() {
-  fs.writeFileSync(BLOCKS_FILE, JSON.stringify({
-    sourceIps: state.sourceIps,
-    targetIps: state.targetIps,
-    ports: state.ports
-  }, null, 2) + '\n');
+  fs.writeFileSync(BLOCKS_FILE, JSON.stringify({ rules: state.rules }, null, 2) + '\n');
 }
 
 function ipToInt(ip) {
@@ -61,76 +51,40 @@ function isBlocked(clientIp, targetHost, targetPort) {
   const clientIpStr = clientIp ? clientIp.replace(/^::ffff:/, '') : '';
   const targetIpStr = targetHost ? targetHost.replace(/^::ffff:/, '') : '';
 
-  for (const blocked of state.sourceIps) {
-    if (matchIp(clientIpStr, blocked)) {
-      return { blocked: true, reason: 'Source IP ' + blocked + ' is blocked' };
+  for (const rule of state.rules) {
+    const checkIp = rule.type === 'source' ? clientIpStr : targetIpStr;
+    if (matchIp(checkIp, rule.ip)) {
+      if (rule.port === null || rule.port === targetPort) {
+        const label = rule.type === 'source' ? 'Source' : 'Target';
+        let reason = label + ' IP ' + rule.ip + ' is blocked';
+        if (rule.port !== null) reason += ' on port ' + rule.port;
+        return { blocked: true, reason };
+      }
     }
-  }
-
-  for (const blocked of state.targetIps) {
-    if (matchIp(targetIpStr, blocked)) {
-      return { blocked: true, reason: 'Target IP ' + blocked + ' is blocked' };
-    }
-  }
-
-  if (targetPort && state.ports.includes(targetPort)) {
-    return { blocked: true, reason: 'Port ' + targetPort + ' is blocked' };
   }
 
   return { blocked: false, reason: null };
 }
 
-function getBlocks() {
-  return {
-    sourceIps: [...state.sourceIps],
-    targetIps: [...state.targetIps],
-    ports: [...state.ports]
-  };
+function getRules() {
+  return state.rules.map(r => ({ ...r }));
 }
 
-function addSourceIp(ip) {
-  if (!state.sourceIps.includes(ip)) {
-    state.sourceIps.push(ip);
+function addRule(type, ip, port) {
+  const portVal = (port !== undefined && port !== null && port !== '') ? parseInt(port, 10) : null;
+  const finalPort = (portVal !== null && !isNaN(portVal)) ? portVal : null;
+  const exists = state.rules.some(r => r.type === type && r.ip === ip && r.port === finalPort);
+  if (!exists) {
+    state.rules.push({ type, ip, port: finalPort });
     save();
   }
 }
 
-function removeSourceIp(ip) {
-  state.sourceIps = state.sourceIps.filter(i => i !== ip);
-  save();
-}
-
-function addTargetIp(ip) {
-  if (!state.targetIps.includes(ip)) {
-    state.targetIps.push(ip);
-    save();
-  }
-}
-
-function removeTargetIp(ip) {
-  state.targetIps = state.targetIps.filter(i => i !== ip);
-  save();
-}
-
-function addPort(port) {
-  const p = parseInt(port, 10);
-  if (!isNaN(p) && !state.ports.includes(p)) {
-    state.ports.push(p);
-    save();
-  }
-}
-
-function removePort(port) {
-  const p = parseInt(port, 10);
-  state.ports = state.ports.filter(i => i !== p);
+function removeRule(type, ip, port) {
+  state.rules = state.rules.filter(r => !(r.type === type && r.ip === ip && r.port === port));
   save();
 }
 
 load();
 
-module.exports = {
-  isBlocked, getBlocks,
-  addSourceIp, removeSourceIp,
-  addTargetIp, removeTargetIp,
-  addPort, removePort
-};
+module.exports = { isBlocked, getRules, addRule, removeRule };

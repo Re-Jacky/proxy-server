@@ -258,7 +258,6 @@ async function toggleProxy() {
 }
 
 function handleBlocksApi(req, res) {
-  // Body parsing helper
   const readBody = () => new Promise((resolve) => {
     let body = '';
     req.on('data', chunk => { body += chunk; });
@@ -269,33 +268,23 @@ function handleBlocksApi(req, res) {
 
   if (req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(blocker.getBlocks()));
+    res.end(JSON.stringify({ rules: blocker.getRules() }));
     return;
   }
 
   readBody().then(body => {
-    if (req.url.includes('/source-ip')) {
-      if (body.ip) {
-        if (req.method === 'POST') blocker.addSourceIp(body.ip);
-        else blocker.removeSourceIp(body.ip);
-        log('info', req.method === 'POST' ? 'Source IP blocked' : 'Source IP unblocked', { ip: body.ip });
-      }
-    } else if (req.url.includes('/target-ip')) {
-      if (body.ip) {
-        if (req.method === 'POST') blocker.addTargetIp(body.ip);
-        else blocker.removeTargetIp(body.ip);
-        log('info', req.method === 'POST' ? 'Target IP blocked' : 'Target IP unblocked', { ip: body.ip });
-      }
-    } else if (req.url.includes('/port')) {
-      const port = parseInt(body.port, 10);
-      if (!isNaN(port)) {
-        if (req.method === 'POST') blocker.addPort(port);
-        else blocker.removePort(port);
-        log('info', req.method === 'POST' ? 'Port blocked' : 'Port unblocked', { port });
+    if (body.type && body.ip) {
+      const port = body.port !== undefined ? body.port : null;
+      if (req.method === 'POST') {
+        blocker.addRule(body.type, body.ip, port);
+        log('info', 'Block rule added', { type: body.type, ip: body.ip, port });
+      } else if (req.method === 'DELETE') {
+        blocker.removeRule(body.type, body.ip, port !== null ? parseInt(port, 10) : null);
+        log('info', 'Block rule removed', { type: body.type, ip: body.ip, port });
       }
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(blocker.getBlocks()));
+    res.end(JSON.stringify({ rules: blocker.getRules() }));
   });
 }
 
@@ -309,25 +298,31 @@ function serveBlocksPage(res) {
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
-.container { max-width: 700px; margin: 0 auto; }
-.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+.container { max-width: 800px; margin: 0 auto; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
 .header h1 { font-size: 24px; font-weight: 600; }
 .back-link { display:inline-block; padding:6px 14px; background:#334155; color:#e2e8f0; border-radius:6px; text-decoration:none; font-size:13px; }
 .back-link:hover { background: #475569; }
-.section { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
-.section h2 { font-size: 14px; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 16px; }
-.block-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #334155; font-size: 14px; }
-.block-item:last-child { border-bottom: none; }
+.card { background: #1e293b; border-radius: 12px; padding: 20px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 10px 12px; font-size: 14px; }
+th { color: #94a3b8; font-weight: 500; border-bottom: 2px solid #334155; }
+td { border-bottom: 1px solid #1e293b; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+.badge-source { background: #1e3a5f; color: #93c5fd; }
+.badge-target { background: #5b1e1e; color: #fca5a5; }
 .remove-btn { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 13px; padding: 4px 8px; border-radius: 4px; }
 .remove-btn:hover { background: #450a0a; }
-.add-row { display: flex; gap: 8px; margin-top: 12px; }
-.add-row input { flex: 1; padding: 8px 12px; border: 1px solid #334155; border-radius: 6px; background: #0f172a; color: #e2e8f0; font-size: 14px; outline: none; }
-.add-row input:focus { border-color: #3b82f6; }
-.add-row button { padding: 8px 16px; border: none; border-radius: 6px; background: #3b82f6; color: #fff; font-size: 14px; cursor: pointer; }
-.add-row button:hover { background: #2563eb; }
-.add-row button:active { background: #1d4ed8; }
-.empty { text-align: center; color: #64748b; font-size: 14px; padding: 16px 0; }
-.help-text { font-size: 12px; color: #64748b; margin-top: 6px; }
+.add-row { display: flex; gap: 8px; margin-top: 16px; align-items: stretch; }
+.add-row select, .add-row input { padding: 8px 12px; border: 1px solid #334155; border-radius: 6px; background: #0f172a; color: #e2e8f0; font-size: 14px; outline: none; }
+.add-row select:focus, .add-row input:focus { border-color: #3b82f6; }
+.add-row select { min-width: 80px; }
+.add-row input[type="text"] { flex: 1; min-width: 0; }
+.add-row input[type="number"] { width: 90px; }
+.add-row button { padding: 8px 20px; border: none; border-radius: 6px; background: #22c55e; color: #fff; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.add-row button:hover { background: #16a34a; }
+.empty { text-align: center; color: #64748b; font-size: 14px; padding: 32px 0; }
+.help-text { font-size: 12px; color: #64748b; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -336,104 +331,90 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 <h1>Block Rules</h1>
 <a href="/admin" class="back-link">&larr; Dashboard</a>
 </div>
-
-<div class="section">
-<h2>Blocked Source IPs (Client)</h2>
-<div id="sourceIpList"></div>
+<div class="card">
+<table>
+<thead><tr><th>Direction</th><th>IP / CIDR</th><th>Port</th><th></th></tr></thead>
+<tbody id="rulesBody"></tbody>
+</table>
 <div class="add-row">
-<input id="sourceIpInput" type="text" placeholder="e.g. 10.0.0.1 or 192.168.0.0/16">
-<button id="addSourceBtn">Add</button>
+<select id="ruleType">
+<option value="source">Source</option>
+<option value="target">Target</option>
+</select>
+<input id="ruleIp" type="text" placeholder="IP or CIDR, e.g. 10.0.0.1 or 192.168.0.0/16">
+<input id="rulePort" type="number" placeholder="Port (optional)" min="1" max="65535">
+<button id="addRuleBtn">Add Rule</button>
 </div>
-<div class="help-text">Blocks requests coming FROM this IP address</div>
-</div>
-
-<div class="section">
-<h2>Blocked Target IPs (Destination)</h2>
-<div id="targetIpList"></div>
-<div class="add-row">
-<input id="targetIpInput" type="text" placeholder="e.g. 203.0.113.5 or 10.0.0.0/8">
-<button id="addTargetBtn">Add</button>
-</div>
-<div class="help-text">Blocks requests going TO this IP address</div>
-</div>
-
-<div class="section">
-<h2>Blocked Ports</h2>
-<div id="portList"></div>
-<div class="add-row">
-<input id="portInput" type="text" placeholder="e.g. 25">
-<button id="addPortBtn">Add</button>
-</div>
-<div class="help-text">Blocks requests to this destination port</div>
+<div class="help-text">Port is optional — leave blank to block all ports for this IP</div>
 </div>
 </div>
 <script>
-function renderList(containerId, items, labelFn, removeFn) {
-  const el = document.getElementById(containerId);
-  el.innerHTML = '';
-  if (items.length === 0) {
-    el.innerHTML = '<div class="empty">None</div>';
+function renderRules(rules) {
+  var tbody = document.getElementById('rulesBody');
+  tbody.innerHTML = '';
+  if (rules.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">No rules defined. Add one above.</td></tr>';
     return;
   }
-  for (let i = 0; i < items.length; i++) {
-    const div = document.createElement('div');
-    div.className = 'block-item';
-    const label = typeof labelFn === 'function' ? labelFn(items[i]) : items[i];
-    div.innerHTML = '<span>' + label + '</span><button class="remove-btn" data-idx="' + i + '">Remove</button>';
-    div.querySelector('.remove-btn').onclick = function() { removeFn(items[i]); };
-    el.appendChild(div);
+  for (var i = 0; i < rules.length; i++) {
+    var r = rules[i];
+    var tr = document.createElement('tr');
+    var badgeClass = r.type === 'source' ? 'badge-source' : 'badge-target';
+    var badgeLabel = r.type === 'source' ? 'Source' : 'Target';
+    var portLabel = r.port !== null && r.port !== undefined ? r.port : 'All';
+    tr.innerHTML = '<td><span class="badge ' + badgeClass + '">' + badgeLabel + '</span></td><td>' + escapeHtml(r.ip) + '</td><td>' + portLabel + '</td>';
+    var removeTd = document.createElement('td');
+    removeTd.style.textAlign = 'right';
+    var removeBtn = document.createElement('button');
+    removeBtn.className = 'remove-btn';
+    removeBtn.textContent = 'Remove';
+    removeBtn.onclick = (function(rule) {
+      return function() {
+        fetch('/admin/api/blocks', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: rule.type, ip: rule.ip, port: rule.port }) })
+          .then(function(r) { return r.json(); })
+          .then(function(d) { renderRules(d.rules); });
+      };
+    })(r);
+    removeTd.appendChild(removeBtn);
+    tr.appendChild(removeTd);
+    tbody.appendChild(tr);
   }
 }
 
-async function loadBlocks() {
-  try {
-    const res = await fetch('/admin/api/blocks');
-    const data = await res.json();
-    renderList('sourceIpList', data.sourceIps || [], null, function(ip) {
-      fetch('/admin/api/blocks/source-ip', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip: ip }) }).then(loadBlocks);
-    });
-    renderList('targetIpList', data.targetIps || [], null, function(ip) {
-      fetch('/admin/api/blocks/target-ip', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip: ip }) }).then(loadBlocks);
-    });
-    renderList('portList', data.ports || [], function(p) { return 'Port ' + p; }, function(port) {
-      fetch('/admin/api/blocks/port', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ port: port }) }).then(loadBlocks);
-    });
-  } catch (err) {
-    console.error('Failed to load blocks:', err);
-  }
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-document.getElementById('addSourceBtn').onclick = function() {
-  var input = document.getElementById('sourceIpInput');
-  var ip = input.value.trim();
-  if (!ip) return;
-  input.disabled = true;
-  fetch('/admin/api/blocks/source-ip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip: ip }) })
-    .then(function() { input.value = ''; input.disabled = false; loadBlocks(); })
-    .catch(function() { input.disabled = false; });
+document.getElementById('addRuleBtn').onclick = function() {
+  var type = document.getElementById('ruleType').value;
+  var ip = document.getElementById('ruleIp').value.trim();
+  var portInput = document.getElementById('rulePort').value.trim();
+  if (!ip) { alert('Enter an IP address or CIDR range'); return; }
+  var body = { type: type, ip: ip };
+  if (portInput !== '') body.port = parseInt(portInput, 10);
+  var btn = document.getElementById('addRuleBtn');
+  btn.disabled = true;
+  btn.textContent = 'Adding...';
+  fetch('/admin/api/blocks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      document.getElementById('ruleIp').value = '';
+      document.getElementById('rulePort').value = '';
+      renderRules(d.rules);
+      btn.disabled = false;
+      btn.textContent = 'Add Rule';
+    })
+    .catch(function() { btn.disabled = false; btn.textContent = 'Add Rule'; });
 };
 
-document.getElementById('addTargetBtn').onclick = function() {
-  var input = document.getElementById('targetIpInput');
-  var ip = input.value.trim();
-  if (!ip) return;
-  input.disabled = true;
-  fetch('/admin/api/blocks/target-ip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip: ip }) })
-    .then(function() { input.value = ''; input.disabled = false; loadBlocks(); })
-    .catch(function() { input.disabled = false; });
-};
+document.getElementById('ruleIp').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('addRuleBtn').click();
+});
+document.getElementById('rulePort').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('addRuleBtn').click();
+});
 
-document.getElementById('addPortBtn').onclick = function() {
-  var input = document.getElementById('portInput');
-  var port = input.value.trim();
-  if (!port) return;
-  input.disabled = true;
-  fetch('/admin/api/blocks/port', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ port: parseInt(port) }) })
-    .then(function() { input.value = ''; input.disabled = false; loadBlocks(); })
-    .catch(function() { input.disabled = false; });
-};
-
-loadBlocks();
+fetch('/admin/api/blocks').then(function(r) { return r.json(); }).then(function(d) { renderRules(d.rules); });
 </script>
 </body>
 </html>`;
