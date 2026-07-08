@@ -4,6 +4,7 @@ const { log } = require('../logger');
 const { REQUEST_TIMEOUT } = require('../config');
 const proxyState = require('../proxy-state');
 const metrics = require('../metrics');
+const blocker = require('../blocker');
 
 function handleHTTPProxy(req, res) {
   const clientIp = req.socket.remoteAddress;
@@ -19,6 +20,14 @@ function handleHTTPProxy(req, res) {
     return;
   }
   
+  const check = blocker.isBlocked(clientIp, parsedUrl.hostname, parsedUrl.port || 80);
+  if (check.blocked) {
+    log('warn', 'Blocked request', { clientIp, targetHost: parsedUrl.hostname, reason: check.reason });
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: check.reason }));
+    return;
+  }
+
   metrics.recordRequest();
   metrics.connectionOpen();
   

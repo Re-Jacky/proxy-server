@@ -4,6 +4,7 @@ const { log } = require('../logger');
 const { CONNECTION_TIMEOUT } = require('../config');
 const proxyState = require('../proxy-state');
 const metrics = require('../metrics');
+const blocker = require('../blocker');
 
 function handleWebSocketUpgrade(req, socket) {
   const clientIp = socket.remoteAddress;
@@ -21,6 +22,14 @@ function handleWebSocketUpgrade(req, socket) {
     return;
   }
   
+  const check = blocker.isBlocked(clientIp, targetHost, targetPort);
+  if (check.blocked) {
+    log('warn', 'Blocked WebSocket', { clientIp, targetHost, reason: check.reason });
+    socket.write(`HTTP/${req.httpVersion} 403 Forbidden\r\nContent-Type: application/json\r\n\r\n{"error":"${check.reason}"}`);
+    socket.end();
+    return;
+  }
+
   if (!proxyState.enabled) {
     socket.write(`HTTP/${req.httpVersion} 503 Service Unavailable\r\n\r\n`);
     socket.end();

@@ -3,6 +3,7 @@ const { log } = require('./logger');
 const { adminAuthenticate } = require('./admin-auth');
 const proxyState = require('./proxy-state');
 const metrics = require('./metrics');
+const blocker = require('./blocker');
 
 const sseClients = new Set();
 
@@ -71,7 +72,10 @@ th { color: #94a3b8; font-weight: 500; position: sticky; top: 0; background: #1e
 <div class="container">
 <div class="header">
 <h1>Proxy Admin</h1>
+<div style="display:flex;align-items:center;gap:12px;">
+<a href="/admin/blocks" style="color:#94a3b8;text-decoration:none;font-size:14px;">Block Rules</a>
 <span id="statusBadge" class="status-badge enabled">Enabled</span>
+</div>
 </div>
 <div class="toggle-row">
 <label class="toggle">
@@ -253,6 +257,129 @@ async function toggleProxy() {
   res.end(html);
 }
 
+function serveBlocksPage(res) {
+  const blocks = blocker.getBlocks();
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Block Rules - Proxy Admin</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
+.container { max-width: 700px; margin: 0 auto; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+.header h1 { font-size: 24px; font-weight: 600; }
+.back-link { color: #94a3b8; text-decoration: none; font-size: 14px; }
+.back-link:hover { color: #e2e8f0; }
+.section { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+.section h2 { font-size: 14px; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 16px; }
+.block-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #334155; font-size: 14px; }
+.block-item:last-child { border-bottom: none; }
+.remove-btn { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 13px; padding: 4px 8px; border-radius: 4px; }
+.remove-btn:hover { background: #450a0a; }
+.add-row { display: flex; gap: 8px; margin-top: 12px; }
+.add-row input { flex: 1; padding: 8px 12px; border: 1px solid #334155; border-radius: 6px; background: #0f172a; color: #e2e8f0; font-size: 14px; outline: none; }
+.add-row input:focus { border-color: #3b82f6; }
+.add-row button { padding: 8px 16px; border: none; border-radius: 6px; background: #3b82f6; color: #fff; font-size: 14px; cursor: pointer; }
+.add-row button:hover { background: #2563eb; }
+.empty { text-align: center; color: #64748b; font-size: 14px; padding: 16px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+<h1>Block Rules</h1>
+<a href="/admin" class="back-link">&larr; Back to Dashboard</a>
+</div>
+
+<div class="section">
+<h2>Blocked IPs &amp; CIDR Ranges</h2>
+<div id="ipList"></div>
+<div class="add-row">
+<input id="ipInput" type="text" placeholder="e.g. 10.0.0.1 or 192.168.0.0/16">
+<button onclick="addIp()">Add</button>
+</div>
+</div>
+
+<div class="section">
+<h2>Blocked Ports</h2>
+<div id="portList"></div>
+<div class="add-row">
+<input id="portInput" type="text" placeholder="e.g. 25">
+<button onclick="addPort()">Add</button>
+</div>
+</div>
+</div>
+<script>
+async function loadBlocks() {
+  const res = await fetch('/admin/api/blocks');
+  const data = await res.json();
+  const ipList = document.getElementById('ipList');
+  const portList = document.getElementById('portList');
+
+  ipList.innerHTML = '';
+  if (data.ips.length === 0) {
+    ipList.innerHTML = '<div class="empty">No IPs blocked</div>';
+  } else {
+    for (const ip of data.ips) {
+      const div = document.createElement('div');
+      div.className = 'block-item';
+      div.innerHTML = '<span>' + ip + '</span><button class="remove-btn" onclick="removeIp(\'' + ip.replace(/'/g, "\\'") + '\')">Remove</button>';
+      ipList.appendChild(div);
+    }
+  }
+
+  portList.innerHTML = '';
+  if (data.ports.length === 0) {
+    portList.innerHTML = '<div class="empty">No ports blocked</div>';
+  } else {
+    for (const port of data.ports) {
+      const div = document.createElement('div');
+      div.className = 'block-item';
+      div.innerHTML = '<span>Port ' + port + '</span><button class="remove-btn" onclick="removePort(' + port + ')">Remove</button>';
+      portList.appendChild(div);
+    }
+  }
+}
+
+async function addIp() {
+  const input = document.getElementById('ipInput');
+  const ip = input.value.trim();
+  if (!ip) return;
+  await fetch('/admin/api/blocks/ip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip }) });
+  input.value = '';
+  loadBlocks();
+}
+
+async function removeIp(ip) {
+  await fetch('/admin/api/blocks/ip', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip }) });
+  loadBlocks();
+}
+
+async function addPort() {
+  const input = document.getElementById('portInput');
+  const port = input.value.trim();
+  if (!port) return;
+  await fetch('/admin/api/blocks/port', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ port: parseInt(port) }) });
+  input.value = '';
+  loadBlocks();
+}
+
+async function removePort(port) {
+  await fetch('/admin/api/blocks/port', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ port }) });
+  loadBlocks();
+}
+
+loadBlocks();
+</script>
+</body>
+</html>`;
+  res.writeHead(200, { 'Content-Type': 'text/html' });
+  res.end(html);
+}
+
 function handleSSE(req, res) {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -287,6 +414,77 @@ function handleAdmin(req, res) {
 
   if (parsedUrl.pathname === '/admin') {
     serveAdminPage(res);
+    return;
+  }
+
+  if (parsedUrl.pathname === '/admin/blocks') {
+    serveBlocksPage(res);
+    return;
+  }
+
+  if (parsedUrl.pathname === '/admin/api/blocks') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(blocker.getBlocks()));
+    return;
+  }
+
+  if (parsedUrl.pathname === '/admin/api/blocks/ip' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      const { ip } = JSON.parse(body);
+      if (ip) {
+        blocker.addIp(ip);
+        log('info', 'IP blocked', { ip });
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(blocker.getBlocks()));
+    });
+    return;
+  }
+
+  if (parsedUrl.pathname === '/admin/api/blocks/ip' && req.method === 'DELETE') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      const { ip } = JSON.parse(body);
+      if (ip) {
+        blocker.removeIp(ip);
+        log('info', 'IP unblocked', { ip });
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(blocker.getBlocks()));
+    });
+    return;
+  }
+
+  if (parsedUrl.pathname === '/admin/api/blocks/port' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      const { port } = JSON.parse(body);
+      if (port !== undefined) {
+        blocker.addPort(port);
+        log('info', 'Port blocked', { port });
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(blocker.getBlocks()));
+    });
+    return;
+  }
+
+  if (parsedUrl.pathname === '/admin/api/blocks/port' && req.method === 'DELETE') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      const { port } = JSON.parse(body);
+      if (port !== undefined) {
+        blocker.removePort(port);
+        log('info', 'Port unblocked', { port });
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(blocker.getBlocks()));
+    });
     return;
   }
 
