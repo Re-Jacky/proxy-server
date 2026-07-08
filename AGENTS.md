@@ -61,6 +61,8 @@ All configuration is via `.env` file:
 | `REQUEST_TIMEOUT` | 30000 | HTTP request timeout (ms) |
 | `CONNECTION_TIMEOUT` | 20000 | Socket connection timeout (ms) |
 | `MAX_CONNECTIONS` | 1000 | Maximum concurrent connections |
+| `ADMIN_USERNAME` | (required) | Admin dashboard username, min 3 chars |
+| `ADMIN_PASSWORD` | (required) | Admin dashboard password, min 8 chars |
 
 **Important**: Configuration validation happens at startup. The server will refuse to start with invalid config.
 
@@ -224,6 +226,10 @@ src/
 ├── config.js          # Configuration loading and validation
 ├── logger.js          # Async logging utilities
 ├── auth.js            # Authentication
+├── admin.js           # SSE dashboard, toggle API, Chart.js page
+├── admin-auth.js      # Basic auth for /admin routes
+├── proxy-state.js     # Singleton on/off toggle
+├── metrics.js         # In-memory counters: connections, bytes, rate
 └── handlers/
     ├── http.js        # HTTP proxy handler with SSRF protection
     ├── https.js       # HTTPS CONNECT handler
@@ -235,6 +241,10 @@ src/
 - **config.js**: Loads .env, validates all config, exports constants
 - **logger.js**: Async file logging + console output, respects LOG_LEVEL
 - **auth.js**: Basic auth, credential validation
+- **admin.js**: SSE dashboard, toggle API, Chart.js page
+- **admin-auth.js**: Basic auth for /admin routes
+- **proxy-state.js**: Singleton on/off toggle
+- **metrics.js**: In-memory counters: connections, bytes, rate
 - **handlers/*.js**: Protocol-specific proxy logic, input validation, error handling
 
 ## Common Operations
@@ -336,3 +346,11 @@ describe('Module Name', () => {
 - **Endpoint**: `GET /health`
 - **Response**: JSON with status, uptime, timestamp
 - **Use cases**: Load balancers, monitoring, container orchestration
+
+## Admin Routes
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/admin` | GET | Admin dashboard page (admin auth) |
+| `/admin/api/status` | GET | JSON state + metrics (admin auth) |
+| `/admin/api/toggle` | POST | Toggle proxy on/off (admin auth) |
+| `/admin/api/events` | GET | SSE metrics stream (admin auth) |
