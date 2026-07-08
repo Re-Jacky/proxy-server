@@ -7,6 +7,7 @@ const { handleHTTPSProxy } = require('./handlers/https');
 const { handleWebSocketUpgrade } = require('./handlers/websocket');
 const { handleAdmin } = require('./admin');
 const { adminAuthenticate } = require('./admin-auth');
+const proxyState = require('./proxy-state');
 
 const startTime = Date.now();
 
@@ -81,7 +82,14 @@ httpServer.on('connect', (req, clientSocket, head) => {
     });
   }
 
+  if (!proxyState.enabled) {
+    clientSocket.write(`HTTP/${req.httpVersion} 503 Service Unavailable\r\n\r\n`);
+    clientSocket.end();
+    return;
+  }
+
   handleHTTPSProxy(req, clientSocket, head);
+  proxyState.trackSocket(clientSocket);
 });
 
 httpServer.on('upgrade', (req, socket, head) => {
@@ -108,7 +116,14 @@ httpServer.on('upgrade', (req, socket, head) => {
     });
   }
 
+  if (!proxyState.enabled) {
+    socket.write(`HTTP/${req.httpVersion} 503 Service Unavailable\r\n\r\n`);
+    socket.end();
+    return;
+  }
+
   handleWebSocketUpgrade(req, socket);
+  proxyState.trackSocket(socket);
 });
 
 httpServer.listen(PORT, () => {
