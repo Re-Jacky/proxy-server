@@ -112,7 +112,14 @@ th { color: #94a3b8; font-weight: 500; position: sticky; top: 0; background: #1e
 <div class="add-row" style="margin-bottom:12px;">
 <input id="filterIp" type="text" placeholder="Filter by IP" style="flex:1;padding:6px 10px;border:1px solid #334155;border-radius:4px;background:#0f172a;color:#e2e8f0;font-size:13px;outline:none;" oninput="renderRequestLog()">
 <input id="filterPort" type="text" placeholder="Filter by port" style="width:100px;padding:6px 10px;border:1px solid #334155;border-radius:4px;background:#0f172a;color:#e2e8f0;font-size:13px;outline:none;" oninput="renderRequestLog()">
+<button onclick="clearLog()" style="padding:6px 14px;border:none;border-radius:4px;background:#dc2626;color:#fff;font-size:13px;cursor:pointer;white-space:nowrap;">Clear</button>
 </div>
+<script>
+function clearLog() {
+  if (!confirm('Clear all request log entries?')) return;
+  fetch('/admin/api/log/clear', { method: 'POST' }).then(function() { requestLog = []; renderRequestLog(); });
+}
+</script>
 <div class="history-wrapper">
 <table>
 <thead><tr><th>Time</th><th>Source IP</th><th>Method</th><th>Target</th><th>Port</th><th>Status</th></tr></thead>
@@ -477,6 +484,13 @@ function handleAdmin(req, res) {
 
   if (parsedUrl.pathname === '/admin/blocks') {
     serveBlocksPage(res);
+    return;
+  }
+
+  if (parsedUrl.pathname === '/admin/api/log/clear' && req.method === 'POST') {
+    metrics.clearRequestLog();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true }));
     return;
   }
 

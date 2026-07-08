@@ -83,6 +83,10 @@ function getRequestLog() {
   return state.requestLog;
 }
 
+function clearRequestLog() {
+  state.requestLog = [];
+}
+
 module.exports = {
   recordRequest,
   recordBytes,
@@ -91,5 +95,6 @@ module.exports = {
   logRequest,
   getSnapshot,
   getHistory,
-  getRequestLog
+  getRequestLog,
+  clearRequestLog
 };
