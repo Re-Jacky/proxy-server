@@ -54,6 +54,13 @@ function handleWebSocketUpgrade(req, socket) {
   
   metrics.connectionOpen();
   
+  log('info', 'WebSocket upgrade request', {
+    clientIp: clientIp,
+    targetHost: targetHost,
+    targetPort: targetPort,
+    code: 'WS_REQ'
+  });
+
   metrics.logRequest({
     sourceIp: clientIp,
     method: 'WS',

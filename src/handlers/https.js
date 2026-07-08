@@ -9,7 +9,6 @@ function handleHTTPSProxy(req, clientSocket, head) {
   const clientIp = clientSocket.remoteAddress;
   const [hostname, port] = req.url.split(':');
   const targetPort = port || 443;
-  const proto = (targetPort === 443) ? 'WSS' : 'HTTPS';
   
   if (!hostname) {
     log('error', 'Invalid hostname in HTTPS CONNECT', {
@@ -26,10 +25,10 @@ function handleHTTPSProxy(req, clientSocket, head) {
     log('warn', 'Blocked HTTPS CONNECT', { clientIp, targetHost: hostname, reason: check.reason });
     metrics.logRequest({
       sourceIp: clientIp,
-      method: proto,
+      method: 'CONNECT',
       targetHost: hostname,
       targetPort: targetPort,
-      protocol: proto,
+      protocol: 'HTTPS',
       statusCode: 403
     });
     clientSocket.write(`HTTP/${req.httpVersion} 403 Forbidden\r\nContent-Type: application/json\r\n\r\n{"error":"${check.reason}"}`);
@@ -40,10 +39,10 @@ function handleHTTPSProxy(req, clientSocket, head) {
   if (!proxyState.enabled) {
     metrics.logRequest({
       sourceIp: clientIp,
-      method: proto,
+      method: 'CONNECT',
       targetHost: hostname,
       targetPort: targetPort,
-      protocol: proto,
+      protocol: 'HTTPS',
       statusCode: 503
     });
     clientSocket.write(`HTTP/${req.httpVersion} 503 Service Unavailable\r\n\r\n`);
@@ -52,12 +51,20 @@ function handleHTTPSProxy(req, clientSocket, head) {
   }
   
   metrics.connectionOpen();
-  metrics.logRequest({
-    sourceIp: clientIp,
-    method: proto,
+
+  log('info', 'HTTPS CONNECT request', {
+    clientIp: clientIp,
     targetHost: hostname,
     targetPort: targetPort,
-    protocol: proto,
+    code: 'CONN_REQ'
+  });
+
+  metrics.logRequest({
+    sourceIp: clientIp,
+    method: 'CONNECT',
+    targetHost: hostname,
+    targetPort: targetPort,
+    protocol: 'HTTPS',
     statusCode: 200
   });
 
