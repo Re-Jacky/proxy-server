@@ -103,25 +103,22 @@ th { color: #94a3b8; font-weight: 500; position: sticky; top: 0; background: #1e
 <canvas id="reqChart" height="150"></canvas>
 </div>
 <div class="history-table">
-<h2>Connection History</h2>
+<h2>Request Log</h2>
+<div class="add-row" style="margin-bottom:12px;">
+<input id="filterIp" type="text" placeholder="Filter by IP" style="flex:1;padding:6px 10px;border:1px solid #334155;border-radius:4px;background:#0f172a;color:#e2e8f0;font-size:13px;outline:none;" oninput="renderRequestLog()">
+<input id="filterPort" type="text" placeholder="Filter by port" style="width:100px;padding:6px 10px;border:1px solid #334155;border-radius:4px;background:#0f172a;color:#e2e8f0;font-size:13px;outline:none;" oninput="renderRequestLog()">
+</div>
 <div class="history-wrapper">
 <table>
-<thead><tr><th>Time</th><th>Connections</th></tr></thead>
-<tbody id="historyBody"></tbody>
+<thead><tr><th>Time</th><th>Source IP</th><th>Method</th><th>Target</th><th>Port</th><th>Status</th></tr></thead>
+<tbody id="logBody"></tbody>
 </table>
-</div>
-<div class="pagination">
-<button id="prevPage" onclick="changePage(-1)" disabled>Prev</button>
-<span id="pageInfo">Page 1</span>
-<button id="nextPage" onclick="changePage(1)" disabled>Next</button>
 </div>
 </div>
 </div>
 <script>
 let reqChart = null;
-let historyData = [];
-let currentPage = 1;
-const PER_PAGE = 10;
+let requestLog = [];
 const evtSource = new EventSource('/admin/api/events');
 evtSource.onmessage = (e) => {
   try {
@@ -129,7 +126,7 @@ evtSource.onmessage = (e) => {
     if (data.type === 'metrics') {
       updateStats(data);
       updateChart(data);
-      updateHistory(data);
+      updateRequestLog(data);
     }
     if (data.type === 'state') {
       updateToggle(data.enabled);
@@ -190,46 +187,50 @@ function updateChart(data) {
   reqChart.update();
 }
 
-function updateHistory(data) {
-  if (data.history) {
-    historyData = data.history;
-    const totalPages = Math.max(1, Math.ceil(historyData.length / PER_PAGE));
-    if (currentPage > totalPages) currentPage = totalPages;
-    renderHistoryPage();
+function updateRequestLog(data) {
+  if (data.requestLog) {
+    requestLog = data.requestLog;
   }
+  if (data.newLog && data.newLog.length > 0) {
+    for (const entry of data.newLog) {
+      const exists = requestLog.some(function(e) { return e.seq === entry.seq; });
+      if (!exists) requestLog.push(entry);
+    }
+    if (requestLog.length > 500) requestLog = requestLog.slice(-500);
+  }
+  renderRequestLog();
 }
 
-function renderHistoryPage() {
-  const tbody = document.getElementById('historyBody');
-  const totalPages = Math.max(1, Math.ceil(historyData.length / PER_PAGE));
-  const start = (currentPage - 1) * PER_PAGE;
-  const page = historyData.slice(start, start + PER_PAGE);
+function renderRequestLog() {
+  const tbody = document.getElementById('logBody');
+  const filterIp = (document.getElementById('filterIp').value || '').trim().toLowerCase();
+  const filterPort = (document.getElementById('filterPort').value || '').trim();
 
+  var filtered = requestLog;
+  if (filterIp) {
+    filtered = filtered.filter(function(e) {
+      return (e.sourceIp || '').toLowerCase().indexOf(filterIp) !== -1 || (e.targetHost || '').toLowerCase().indexOf(filterIp) !== -1;
+    });
+  }
+  if (filterPort) {
+    filtered = filtered.filter(function(e) {
+      return String(e.targetPort || '').indexOf(filterPort) !== -1;
+    });
+  }
+
+  var show = filtered.slice(-50).reverse();
   tbody.innerHTML = '';
-  for (const entry of page) {
-    const row = document.createElement('tr');
-    const time = new Date(entry.time).toLocaleTimeString();
-    row.innerHTML = '<td>' + time + '</td><td>' + entry.connections + '</td>';
-    tbody.appendChild(row);
+  if (show.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#64748b;padding:32px;">No requests logged yet</td></tr>';
+    return;
   }
-
-  if (historyData.length === 0) {
-    const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="2" style="text-align:center;color:#64748b;">No data</td>';
-    tbody.appendChild(row);
+  for (var i = 0; i < show.length; i++) {
+    var e = show[i];
+    var tr = document.createElement('tr');
+    var time = new Date(e.time).toLocaleTimeString();
+    tr.innerHTML = '<td>' + time + '</td><td>' + (e.sourceIp || '') + '</td><td>' + (e.method || '') + '</td><td>' + (e.targetHost || '') + '</td><td>' + (e.targetPort || '') + '</td><td>' + (e.statusCode || '') + '</td>';
+    tbody.appendChild(tr);
   }
-
-  document.getElementById('pageInfo').textContent = 'Page ' + currentPage + ' of ' + totalPages;
-  document.getElementById('prevPage').disabled = currentPage <= 1;
-  document.getElementById('nextPage').disabled = currentPage >= totalPages;
-}
-
-function changePage(delta) {
-  const totalPages = Math.max(1, Math.ceil(historyData.length / PER_PAGE));
-  const newPage = currentPage + delta;
-  if (newPage < 1 || newPage > totalPages) return;
-  currentPage = newPage;
-  renderHistoryPage();
 }
 
 function updateToggle(enabled) {
@@ -432,13 +433,23 @@ function handleSSE(req, res) {
 
   sseClients.add(res);
 
-  // Push initial state
-  const snapshot = metrics.getSnapshot();
-  res.write(`data: ${JSON.stringify({ type: 'metrics', ...snapshot, history: metrics.getHistory() })}\n\n`);
+  let lastSeq = 0;
+
+  const send = (data) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  const allLog = metrics.getRequestLog();
+  lastSeq = allLog.length > 0 ? allLog[allLog.length - 1].seq : 0;
+  send({ type: 'metrics', ...metrics.getSnapshot(), history: metrics.getHistory(), requestLog: allLog });
 
   const interval = setInterval(() => {
-    const snap = metrics.getSnapshot();
-    res.write(`data: ${JSON.stringify({ type: 'metrics', ...snap, history: metrics.getHistory() })}\n\n`);
+    const full = metrics.getRequestLog();
+    const newEntries = full.filter(e => e.seq > lastSeq);
+    if (newEntries.length > 0) {
+      lastSeq = full[full.length - 1].seq;
+    }
+    send({ type: 'metrics', ...metrics.getSnapshot(), history: metrics.getHistory(), newLog: newEntries.slice(-20) });
   }, 1000);
 
   const cleanup = () => {

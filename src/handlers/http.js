@@ -93,6 +93,16 @@ function handleHTTPProxy(req, res) {
     proxyRes.on('data', (chunk) => { bytesReceived += chunk.length; });
     proxyRes.on('end', () => {
       metrics.recordBytes(bytesSent, bytesReceived);
+      metrics.logRequest({
+        sourceIp: clientIp,
+        method: req.method,
+        targetHost: parsedUrl.hostname,
+        targetPort: parsedUrl.port || 80,
+        protocol: 'HTTP',
+        statusCode: proxyRes.statusCode,
+        bytesSent,
+        bytesReceived
+      });
     });
     proxyRes.pipe(res);
   });

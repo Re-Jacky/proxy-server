@@ -76,6 +76,15 @@ function handleWebSocketUpgrade(req, socket) {
       targetPort: targetPort
     });
 
+    metrics.logRequest({
+      sourceIp: clientIp,
+      method: 'WS',
+      targetHost: targetHost,
+      targetPort: targetPort,
+      protocol: 'WebSocket',
+      statusCode: 101
+    });
+
     socket.write(`HTTP/${req.httpVersion} 101 Switching Protocols\r\n`);
     socket.write('Upgrade: websocket\r\n');
     socket.write('Connection: Upgrade\r\n');

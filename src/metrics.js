@@ -1,16 +1,19 @@
 const { log } = require('./logger');
 
-const RATE_WINDOW = 60; // seconds
+const RATE_WINDOW = 60;
 const HISTORY_SIZE = 60;
+const REQUEST_LOG_SIZE = 500;
 
 const state = {
   activeConnections: 0,
   totalBytes: { sent: 0, received: 0 },
   requestTimestamps: [],
-  connectionHistory: []
+  connectionHistory: [],
+  requestLog: []
 };
 
 let lastPushedConnections = -1;
+let requestLogSeq = 0;
 
 function recordRequest() {
   state.requestTimestamps.push(Date.now());
@@ -54,6 +57,15 @@ function pushHistory() {
   }
 }
 
+function logRequest(entry) {
+  entry.seq = ++requestLogSeq;
+  entry.time = new Date().toISOString();
+  state.requestLog.push(entry);
+  if (state.requestLog.length > REQUEST_LOG_SIZE) {
+    state.requestLog.shift();
+  }
+}
+
 function getSnapshot() {
   return {
     activeConnections: state.activeConnections,
@@ -67,11 +79,17 @@ function getHistory() {
   return [...state.connectionHistory];
 }
 
+function getRequestLog() {
+  return state.requestLog;
+}
+
 module.exports = {
   recordRequest,
   recordBytes,
   connectionOpen,
   connectionClose,
+  logRequest,
   getSnapshot,
-  getHistory
+  getHistory,
+  getRequestLog
 };

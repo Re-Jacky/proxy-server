@@ -76,6 +76,15 @@ function handleHTTPSProxy(req, clientSocket, head) {
       targetPort: targetPort
     });
     
+    metrics.logRequest({
+      sourceIp: clientIp,
+      method: 'CONNECT',
+      targetHost: hostname,
+      targetPort: targetPort,
+      protocol: 'HTTPS',
+      statusCode: 200
+    });
+    
     clientSocket.write(`HTTP/${req.httpVersion} 200 Connection Established\r\n\r\n`);
     serverSocket.write(head);
     serverSocket.on('data', (chunk) => { bytesDown += chunk.length; });
