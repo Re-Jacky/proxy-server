@@ -116,7 +116,6 @@ th { color: #94a3b8; font-weight: 500; position: sticky; top: 0; background: #1e
 </div>
 <script>
 function clearLog() {
-  if (!confirm('Clear all request log entries?')) return;
   fetch('/admin/api/log/clear', { method: 'POST' }).then(function() { requestLog = []; renderRequestLog(); });
 }
 </script>
