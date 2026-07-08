@@ -54,6 +54,15 @@ function handleWebSocketUpgrade(req, socket) {
   
   metrics.connectionOpen();
   
+  metrics.logRequest({
+    sourceIp: clientIp,
+    method: 'WS',
+    targetHost: targetHost,
+    targetPort: targetPort,
+    protocol: parsedUrl.protocol === 'wss:' ? 'WSS' : 'WS',
+    statusCode: 101
+  });
+  
   let cleanedUp = false;
   let bytesUp = 0, bytesDown = 0;
   function cleanup() {
@@ -92,15 +101,6 @@ function handleWebSocketUpgrade(req, socket) {
       targetPort: targetPort
     });
 
-    metrics.logRequest({
-      sourceIp: clientIp,
-      method: 'WS',
-      targetHost: targetHost,
-      targetPort: targetPort,
-      protocol: parsedUrl.protocol === 'wss:' ? 'WSS' : 'WS',
-      statusCode: 101
-    });
-
     socket.write(`HTTP/${req.httpVersion} 101 Switching Protocols\r\n`);
     socket.write('Upgrade: websocket\r\n');
     socket.write('Connection: Upgrade\r\n');
@@ -131,15 +131,6 @@ function handleWebSocketUpgrade(req, socket) {
       stack: err.stack
     });
     
-    metrics.logRequest({
-      sourceIp: clientIp,
-      method: 'WS',
-      targetHost: targetHost,
-      targetPort: targetPort,
-      protocol: 'WS',
-      statusCode: 502
-    });
-    
     socket.end();
     cleanup();
   });
@@ -150,15 +141,6 @@ function handleWebSocketUpgrade(req, socket) {
       code: 'WS_TIMEOUT',
       targetHost: targetHost,
       targetPort: targetPort
-    });
-    
-    metrics.logRequest({
-      sourceIp: clientIp,
-      method: 'WS',
-      targetHost: targetHost,
-      targetPort: targetPort,
-      protocol: 'WS',
-      statusCode: 504
     });
     
     serverSocket.destroy();
