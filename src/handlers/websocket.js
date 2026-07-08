@@ -30,7 +30,7 @@ function handleWebSocketUpgrade(req, socket) {
       method: 'WS',
       targetHost: targetHost,
       targetPort: targetPort,
-      protocol: 'WebSocket',
+      protocol: 'WS',
       statusCode: 403
     });
     socket.write(`HTTP/${req.httpVersion} 403 Forbidden\r\nContent-Type: application/json\r\n\r\n{"error":"${check.reason}"}`);
@@ -44,7 +44,7 @@ function handleWebSocketUpgrade(req, socket) {
       method: 'WS',
       targetHost: targetHost,
       targetPort: targetPort,
-      protocol: 'WebSocket',
+      protocol: 'WS',
       statusCode: 503
     });
     socket.write(`HTTP/${req.httpVersion} 503 Service Unavailable\r\n\r\n`);
@@ -97,7 +97,7 @@ function handleWebSocketUpgrade(req, socket) {
       method: 'WS',
       targetHost: targetHost,
       targetPort: targetPort,
-      protocol: 'WebSocket',
+      protocol: parsedUrl.protocol === 'wss:' ? 'WSS' : 'WS',
       statusCode: 101
     });
 
@@ -136,7 +136,7 @@ function handleWebSocketUpgrade(req, socket) {
       method: 'WS',
       targetHost: targetHost,
       targetPort: targetPort,
-      protocol: 'WebSocket',
+      protocol: 'WS',
       statusCode: 502
     });
     
@@ -157,7 +157,7 @@ function handleWebSocketUpgrade(req, socket) {
       method: 'WS',
       targetHost: targetHost,
       targetPort: targetPort,
-      protocol: 'WebSocket',
+      protocol: 'WS',
       statusCode: 504
     });
     

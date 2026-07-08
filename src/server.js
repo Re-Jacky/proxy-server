@@ -131,7 +131,7 @@ httpServer.on('upgrade', (req, socket, head) => {
       method: 'WS',
       targetHost: '',
       targetPort: 0,
-      protocol: 'WebSocket',
+      protocol: 'WS',
       statusCode: 503
     });
     socket.write(`HTTP/${req.httpVersion} 503 Service Unavailable\r\n\r\n`);

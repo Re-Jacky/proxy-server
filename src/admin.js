@@ -121,7 +121,7 @@ function clearLog() {
 </script>
 <div class="history-wrapper">
 <table>
-<thead><tr><th>Time</th><th>Source IP</th><th>Method</th><th>Target</th><th>Port</th><th>Status</th></tr></thead>
+<thead><tr><th>Time</th><th>Source IP</th><th>Method</th><th>Protocol</th><th>Target</th><th>Port</th><th>Status</th></tr></thead>
 <tbody id="logBody"></tbody>
 </table>
 </div>
@@ -232,14 +232,14 @@ function renderRequestLog() {
   var show = filtered.slice(-50).reverse();
   tbody.innerHTML = '';
   if (show.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#64748b;padding:32px;">No requests logged yet</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#64748b;padding:32px;">No requests logged yet</td></tr>';
     return;
   }
   for (var i = 0; i < show.length; i++) {
     var e = show[i];
     var tr = document.createElement('tr');
     var time = new Date(e.time).toLocaleTimeString();
-    tr.innerHTML = '<td>' + time + '</td><td>' + (e.sourceIp || '') + '</td><td>' + (e.method || '') + '</td><td>' + (e.targetHost || '') + '</td><td>' + (e.targetPort || '') + '</td><td>' + (e.statusCode || '') + '</td>';
+    tr.innerHTML = '<td>' + time + '</td><td>' + (e.sourceIp || '') + '</td><td>' + (e.method || '') + '</td><td>' + (e.protocol || '') + '</td><td>' + (e.targetHost || '') + '</td><td>' + (e.targetPort || '') + '</td><td>' + (e.statusCode || '') + '</td>';
     tbody.appendChild(tr);
   }
 }
