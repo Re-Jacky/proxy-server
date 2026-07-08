@@ -50,9 +50,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .chart-container h2 { font-size: 14px; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 16px; }
 .history-table { background: #1e293b; border-radius: 12px; padding: 20px; }
 .history-table h2 { font-size: 14px; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 16px; }
+.history-wrapper { max-height: 320px; overflow-y: auto; }
+.history-wrapper::-webkit-scrollbar { width: 6px; }
+.history-wrapper::-webkit-scrollbar-track { background: #0f172a; border-radius: 3px; }
+.history-wrapper::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #334155; font-size: 13px; }
-th { color: #94a3b8; font-weight: 500; }
+th { color: #94a3b8; font-weight: 500; position: sticky; top: 0; background: #1e293b; }
+.pagination { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; }
+.pagination button { padding: 6px 14px; border: none; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; background: #334155; color: #e2e8f0; }
+.pagination button:hover { background: #475569; }
+.pagination button:disabled { opacity: 0.4; cursor: default; }
+.pagination span { font-size: 13px; color: #94a3b8; }
 .button { padding: 8px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
 .button-primary { background: #3b82f6; color: #fff; }
 .button-primary:hover { background: #2563eb; }
@@ -91,14 +100,24 @@ th { color: #94a3b8; font-weight: 500; }
 </div>
 <div class="history-table">
 <h2>Connection History</h2>
+<div class="history-wrapper">
 <table>
 <thead><tr><th>Time</th><th>Connections</th></tr></thead>
 <tbody id="historyBody"></tbody>
 </table>
 </div>
+<div class="pagination">
+<button id="prevPage" onclick="changePage(-1)" disabled>Prev</button>
+<span id="pageInfo">Page 1</span>
+<button id="nextPage" onclick="changePage(1)" disabled>Next</button>
+</div>
+</div>
 </div>
 <script>
 let reqChart = null;
+let historyData = [];
+let currentPage = 1;
+const PER_PAGE = 10;
 const evtSource = new EventSource('/admin/api/events');
 evtSource.onmessage = (e) => {
   try {
@@ -168,15 +187,45 @@ function updateChart(data) {
 }
 
 function updateHistory(data) {
-  const tbody = document.getElementById('historyBody');
-  if (data.history && data.history.length > 0) {
-    const last = data.history[data.history.length - 1];
-    const row = document.createElement('tr');
-    const time = new Date(last.time).toLocaleTimeString();
-    row.innerHTML = '<td>' + time + '</td><td>' + last.connections + '</td>';
-    tbody.appendChild(row);
-    while (tbody.children.length > 60) tbody.removeChild(tbody.firstChild);
+  if (data.history) {
+    historyData = data.history;
+    const totalPages = Math.max(1, Math.ceil(historyData.length / PER_PAGE));
+    if (currentPage > totalPages) currentPage = totalPages;
+    renderHistoryPage();
   }
+}
+
+function renderHistoryPage() {
+  const tbody = document.getElementById('historyBody');
+  const totalPages = Math.max(1, Math.ceil(historyData.length / PER_PAGE));
+  const start = (currentPage - 1) * PER_PAGE;
+  const page = historyData.slice(start, start + PER_PAGE);
+
+  tbody.innerHTML = '';
+  for (const entry of page) {
+    const row = document.createElement('tr');
+    const time = new Date(entry.time).toLocaleTimeString();
+    row.innerHTML = '<td>' + time + '</td><td>' + entry.connections + '</td>';
+    tbody.appendChild(row);
+  }
+
+  if (historyData.length === 0) {
+    const row = document.createElement('tr');
+    row.innerHTML = '<td colspan="2" style="text-align:center;color:#64748b;">No data</td>';
+    tbody.appendChild(row);
+  }
+
+  document.getElementById('pageInfo').textContent = 'Page ' + currentPage + ' of ' + totalPages;
+  document.getElementById('prevPage').disabled = currentPage <= 1;
+  document.getElementById('nextPage').disabled = currentPage >= totalPages;
+}
+
+function changePage(delta) {
+  const totalPages = Math.max(1, Math.ceil(historyData.length / PER_PAGE));
+  const newPage = currentPage + delta;
+  if (newPage < 1 || newPage > totalPages) return;
+  currentPage = newPage;
+  renderHistoryPage();
 }
 
 function updateToggle(enabled) {

@@ -10,6 +10,8 @@ const state = {
   connectionHistory: []
 };
 
+let lastPushedConnections = -1;
+
 function recordRequest() {
   state.requestTimestamps.push(Date.now());
   trim();
@@ -22,10 +24,12 @@ function recordBytes(sent, received) {
 
 function connectionOpen() {
   state.activeConnections++;
+  pushHistory();
 }
 
 function connectionClose() {
   state.activeConnections = Math.max(0, state.activeConnections - 1);
+  pushHistory();
 }
 
 function trim() {
@@ -39,6 +43,8 @@ function getRequestRate() {
 }
 
 function pushHistory() {
+  if (state.activeConnections === lastPushedConnections) return;
+  lastPushedConnections = state.activeConnections;
   state.connectionHistory.push({
     time: new Date().toISOString(),
     connections: state.activeConnections
@@ -49,7 +55,6 @@ function pushHistory() {
 }
 
 function getSnapshot() {
-  pushHistory();
   return {
     activeConnections: state.activeConnections,
     totalBytes: { ...state.totalBytes },
