@@ -104,21 +104,20 @@ function handleHTTPProxy(req, res) {
       headers: proxyRes.headers
     });
     
+    metrics.logRequest({
+      sourceIp: clientIp,
+      method: req.method,
+      targetHost: parsedUrl.hostname,
+      targetPort: parsedUrl.port || 80,
+      protocol: 'HTTP',
+      statusCode: proxyRes.statusCode
+    });
+    
     res.writeHead(proxyRes.statusCode, proxyRes.headers);
     let bytesReceived = 0;
     proxyRes.on('data', (chunk) => { bytesReceived += chunk.length; });
     proxyRes.on('end', () => {
       metrics.recordBytes(bytesSent, bytesReceived);
-      metrics.logRequest({
-        sourceIp: clientIp,
-        method: req.method,
-        targetHost: parsedUrl.hostname,
-        targetPort: parsedUrl.port || 80,
-        protocol: 'HTTP',
-        statusCode: proxyRes.statusCode,
-        bytesSent,
-        bytesReceived
-      });
     });
     proxyRes.pipe(res);
   });
@@ -137,9 +136,18 @@ function handleHTTPProxy(req, res) {
       stack: err.stack
     });
     
+    metrics.logRequest({
+      sourceIp: clientIp,
+      method: req.method,
+      targetHost: parsedUrl.hostname,
+      targetPort: parsedUrl.port || 80,
+      protocol: 'HTTP',
+      statusCode: 502
+    });
+    
     if (!res.headersSent) {
-      res.writeHead(500);
-      res.end('Proxy error');
+      res.writeHead(502);
+      res.end('Bad Gateway');
     }
     cleanup();
   });
@@ -151,6 +159,16 @@ function handleHTTPProxy(req, res) {
       url: req.url
     });
     proxyReq.destroy();
+    
+    metrics.logRequest({
+      sourceIp: clientIp,
+      method: req.method,
+      targetHost: parsedUrl.hostname,
+      targetPort: parsedUrl.port || 80,
+      protocol: 'HTTP',
+      statusCode: 504
+    });
+    
     if (!res.headersSent) {
       res.writeHead(504);
       res.end('Gateway Timeout');

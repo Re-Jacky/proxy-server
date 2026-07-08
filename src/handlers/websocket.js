@@ -131,6 +131,15 @@ function handleWebSocketUpgrade(req, socket) {
       stack: err.stack
     });
     
+    metrics.logRequest({
+      sourceIp: clientIp,
+      method: 'WS',
+      targetHost: targetHost,
+      targetPort: targetPort,
+      protocol: 'WebSocket',
+      statusCode: 502
+    });
+    
     socket.end();
     cleanup();
   });
@@ -142,6 +151,16 @@ function handleWebSocketUpgrade(req, socket) {
       targetHost: targetHost,
       targetPort: targetPort
     });
+    
+    metrics.logRequest({
+      sourceIp: clientIp,
+      method: 'WS',
+      targetHost: targetHost,
+      targetPort: targetPort,
+      protocol: 'WebSocket',
+      statusCode: 504
+    });
+    
     serverSocket.destroy();
     socket.end();
     cleanup();

@@ -123,6 +123,15 @@ function handleHTTPSProxy(req, clientSocket, head) {
       stack: err.stack
     });
     
+    metrics.logRequest({
+      sourceIp: clientIp,
+      method: 'CONNECT',
+      targetHost: hostname,
+      targetPort: targetPort,
+      protocol: 'HTTPS',
+      statusCode: 502
+    });
+    
     clientSocket.write(`HTTP/${req.httpVersion} 502 Bad Gateway\r\n`);
     clientSocket.write('Content-Type: text/plain\r\n');
     clientSocket.write(`Content-Length: ${err.message.length}\r\n`);
@@ -139,6 +148,16 @@ function handleHTTPSProxy(req, clientSocket, head) {
       targetHost: hostname,
       targetPort: targetPort
     });
+    
+    metrics.logRequest({
+      sourceIp: clientIp,
+      method: 'CONNECT',
+      targetHost: hostname,
+      targetPort: targetPort,
+      protocol: 'HTTPS',
+      statusCode: 504
+    });
+    
     serverSocket.destroy();
     clientSocket.end();
     cleanup();
