@@ -3,6 +3,8 @@ process.env.AUTH_ENABLED = 'true';
 process.env.PROXY_USERNAME = 'testuser';
 process.env.PROXY_PASSWORD = 'testpassword123';
 process.env.LOG_LEVEL = 'error';
+process.env.ADMIN_USERNAME = 'admin';
+process.env.ADMIN_PASSWORD = 'adminpass123';
 
 const { authenticate } = require('../src/auth');
 

@@ -2,6 +2,8 @@ process.env.PORT = '8080';
 process.env.AUTH_ENABLED = 'true';
 process.env.PROXY_USERNAME = 'testuser';
 process.env.PROXY_PASSWORD = 'testpassword123';
+process.env.ADMIN_USERNAME = 'admin';
+process.env.ADMIN_PASSWORD = 'adminpass123';
 
 const config = require('../src/config');
 

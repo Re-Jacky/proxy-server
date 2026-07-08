@@ -49,6 +49,18 @@ if (AUTH_ENABLED) {
 const USERNAME = process.env.PROXY_USERNAME || '';
 const PASSWORD = process.env.PROXY_PASSWORD || '';
 
+// Validate admin credentials
+if (!process.env.ADMIN_USERNAME || process.env.ADMIN_USERNAME.length < 3) {
+  throw new Error('ADMIN_USERNAME must be at least 3 characters long');
+}
+
+if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD.length < 8) {
+  throw new Error('ADMIN_PASSWORD must be at least 8 characters long for security');
+}
+
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
 const logsDir = path.join(__dirname, '..', 'logs');
 const logFilePath = path.join(logsDir, LOG_FILE);
 
@@ -62,6 +74,8 @@ module.exports = {
   REQUEST_TIMEOUT,
   CONNECTION_TIMEOUT,
   MAX_CONNECTIONS,
+  ADMIN_USERNAME,
+  ADMIN_PASSWORD,
   logsDir,
   logFilePath
 };
