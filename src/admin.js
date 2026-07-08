@@ -9,7 +9,11 @@ const sseClients = new Set();
 function broadcast(data) {
   const message = `data: ${JSON.stringify(data)}\n\n`;
   for (const client of sseClients) {
-    client.write(message);
+    try {
+      client.write(message);
+    } catch (err) {
+      sseClients.delete(client);
+    }
   }
 }
 
@@ -97,14 +101,18 @@ th { color: #94a3b8; font-weight: 500; }
 let reqChart = null;
 const evtSource = new EventSource('/admin/api/events');
 evtSource.onmessage = (e) => {
-  const data = JSON.parse(e.data);
-  if (data.type === 'metrics') {
-    updateStats(data);
-    updateChart(data);
-    updateHistory(data);
-  }
-  if (data.type === 'state') {
-    updateToggle(data.enabled);
+  try {
+    const data = JSON.parse(e.data);
+    if (data.type === 'metrics') {
+      updateStats(data);
+      updateChart(data);
+      updateHistory(data);
+    }
+    if (data.type === 'state') {
+      updateToggle(data.enabled);
+    }
+  } catch (err) {
+    console.error('SSE parse error:', err);
   }
 };
 evtSource.onerror = () => console.log('SSE disconnected, reconnecting...');
@@ -215,10 +223,14 @@ function handleSSE(req, res) {
     res.write(`data: ${JSON.stringify({ type: 'metrics', ...snap, history: metrics.getHistory() })}\n\n`);
   }, 1000);
 
-  req.on('close', () => {
+  const cleanup = () => {
     clearInterval(interval);
     sseClients.delete(res);
-  });
+  };
+
+  req.on('close', cleanup);
+  res.on('close', cleanup);
+  res.on('error', cleanup);
 }
 
 function handleAdmin(req, res) {
