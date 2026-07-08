@@ -19,6 +19,11 @@ function broadcast(data) {
 }
 
 function serveAdminPage(res) {
+  const initialEnabled = proxyState.enabled;
+  const checkedAttr = initialEnabled ? 'checked' : '';
+  const badgeClass = initialEnabled ? 'enabled' : 'disabled';
+  const badgeText = initialEnabled ? 'Enabled' : 'Disabled';
+  const toggleText = initialEnabled ? 'Proxy is ON' : 'Proxy is OFF';
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -74,15 +79,15 @@ th { color: #94a3b8; font-weight: 500; position: sticky; top: 0; background: #1e
 <h1>Proxy Admin</h1>
 <div style="display:flex;align-items:center;gap:12px;">
 <a href="/admin/blocks" style="display:inline-block;padding:6px 14px;background:#dc2626;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:500;">Block Rules</a>
-<span id="statusBadge" class="status-badge enabled">Enabled</span>
+<span id="statusBadge" class="status-badge ${badgeClass}">${badgeText}</span>
 </div>
 </div>
 <div class="toggle-row">
 <label class="toggle">
-<input type="checkbox" id="proxyToggle" checked onchange="toggleProxy()">
+<input type="checkbox" id="proxyToggle" ${checkedAttr} onchange="toggleProxy()">
 <span class="slider"></span>
 </label>
-<span class="toggle-label" id="toggleLabel">Proxy is ON</span>
+<span class="toggle-label" id="toggleLabel">${toggleText}</span>
 </div>
 <div class="stats">
 <div class="stat-card">
@@ -441,7 +446,7 @@ function handleSSE(req, res) {
 
   const allLog = metrics.getRequestLog();
   lastSeq = allLog.length > 0 ? allLog[allLog.length - 1].seq : 0;
-  send({ type: 'metrics', ...metrics.getSnapshot(), history: metrics.getHistory(), requestLog: allLog });
+  send({ type: 'state', enabled: proxyState.enabled });
 
   const interval = setInterval(() => {
     const full = metrics.getRequestLog();
