@@ -453,6 +453,7 @@ function handleSSE(req, res) {
   const allLog = metrics.getRequestLog();
   lastSeq = allLog.length > 0 ? allLog[allLog.length - 1].seq : 0;
   send({ type: 'state', enabled: proxyState.enabled });
+  send({ type: 'metrics', ...metrics.getSnapshot(), history: metrics.getHistory(), requestLog: allLog });
 
   const interval = setInterval(() => {
     const full = metrics.getRequestLog();
