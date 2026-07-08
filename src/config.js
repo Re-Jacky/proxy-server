@@ -54,9 +54,9 @@ if (!process.env.ADMIN_USERNAME || process.env.ADMIN_USERNAME.length < 3) {
   throw new Error('ADMIN_USERNAME must be at least 3 characters long');
 }
 
-if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD.length < 8) {
-  throw new Error('ADMIN_PASSWORD must be at least 8 characters long for security');
-}
+if (!process.env.ADMIN_PASSWORD) {
+    throw new Error('ADMIN_PASSWORD is required');
+  }
 
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
